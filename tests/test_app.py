@@ -10,6 +10,7 @@ import pandas as pd
 import pytest
 import streamlit as st
 from sklearn.exceptions import InconsistentVersionWarning
+from sklearn.metrics import classification_report, confusion_matrix
 from streamlit.testing.v1 import AppTest
 
 from src.modeling import MODEL_NAMES
@@ -36,9 +37,27 @@ def test_uploaded_holdout_matches_recorded_metrics(monkeypatch, model_name):
             expected.loc[model_name, metric.label], abs=0.000051
         )
     assert len(app.dataframe) == 2
-    assert [tab.label for tab in app.tabs] == [
-        "Confusion matrix", "Classification report", "Data preview"
-    ]
+    assert not app.tabs
+    assert {"Performance summary", "Confusion matrix", "Classification report", "Data preview"} <= {
+        heading.value for heading in app.subheader
+    }
+    frame = pd.read_csv(PROJECT_DIR / "test_data.csv")
+    model_filename = model_name.lower().replace(" ", "_").replace("-", "") + ".joblib"
+    model = joblib.load(PROJECT_DIR / "model" / model_filename)
+    features, target = split_features_target(frame, model)
+    predictions = model.predict(features)
+    matrix = confusion_matrix(target, predictions, labels=model.classes_)
+    assert any(
+        f"false negative: {matrix[1, 0]:,}" in caption.value
+        and f"correct yes: {matrix[1, 1]:,}" in caption.value
+        for caption in app.caption
+    )
+    report = classification_report(
+        target, predictions, labels=model.classes_, output_dict=True, zero_division=0
+    )
+    pd.testing.assert_frame_equal(
+        app.dataframe[0].value, pd.DataFrame(report).transpose().round(4)
+    )
 
 
 @pytest.mark.parametrize("fault", ["empty", "no_target", "missing_feature", "single_class", "unknown_label", "invalid_numeric", "infinity"])

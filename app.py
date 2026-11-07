@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
 from sklearn.exceptions import InconsistentVersionWarning
-from sklearn.metrics import ConfusionMatrixDisplay, classification_report, confusion_matrix
+from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.pipeline import Pipeline
 
 from src.modeling import evaluate_model
@@ -65,6 +65,10 @@ def main() -> None:
     st.write(
         "Investigate how five classification methods identify term-deposit "
         "subscribers in the UCI Bank Marketing dataset."
+    )
+    st.caption(
+        "After upload: six evaluation metrics, a confusion matrix and a "
+        "classification report appear together below."
     )
     st.divider()
     st.subheader("Set up an analysis")
@@ -159,37 +163,75 @@ def main() -> None:
         st.error(f"Evaluation failed. Check the CSV feature values: {error}")
         return
 
-    st.subheader("Performance summary")
+    st.subheader("Performance summary", anchor="performance-summary")
     st.write(
         f"**{model_name}** | {len(features):,} rows | "
         f"{int((target == 'no').sum()):,} no | {int((target == 'yes').sum()):,} yes"
     )
     st.caption("Positive class: yes. Metrics use the uploaded labels and saved pipeline.")
+    st.markdown(
+        "**Explore results:** [Performance](#performance-summary) | "
+        "[Confusion matrix](#confusion-matrix) | "
+        "[Classification report](#classification-report) | "
+        "[Data preview](#data-preview)"
+    )
     for row in (list(metrics.items())[:3], list(metrics.items())[3:]):
         for column, (name, value) in zip(st.columns(3), row, strict=True):
             column.metric(name, f"{value:.4f}", help=METRIC_HELP[name])
 
-    matrix_tab, report_tab, data_tab = st.tabs(
-        ["Confusion matrix", "Classification report", "Data preview"]
-    )
-    with matrix_tab:
+    st.divider()
+    matrix_column, report_column = st.columns(2, gap="large")
+    with matrix_column:
+        st.subheader("Confusion matrix", anchor="confusion-matrix")
         matrix = confusion_matrix(target, predictions, labels=model.classes_)
-        st.caption("Rows are actual labels; columns are predicted labels.")
-        st.write(
-            f"**Correct no:** {matrix[0, 0]:,} | **Correct yes:** {matrix[1, 1]:,} | "
-            f"**False positives:** {matrix[0, 1]:,} | **False negatives:** {matrix[1, 0]:,}"
+        st.caption("Actual labels run down the rows; predictions run across the columns.")
+        figure, axis = plt.subplots(figsize=(6, 4))
+        figure.patch.set_facecolor("#fffcf6")
+        axis.set_facecolor("#fffcf6")
+        descriptions = (
+            ("Correct no", "False positive"),
+            ("False negative", "Correct yes"),
         )
-        figure, axis = plt.subplots(figsize=(5, 4))
-        ConfusionMatrixDisplay(matrix, display_labels=model.classes_        ).plot(ax=axis, cmap="YlOrBr", colorbar=False)
-        st.pyplot(figure, use_container_width=False)
+        colors = (("#e6f0e2", "#fbe8d5"), ("#fbe8d5", "#e6f0e2"))
+        for row in range(2):
+            for col in range(2):
+                axis.add_patch(
+                    plt.Rectangle((col, row), 1, 1, facecolor=colors[row][col],
+                                  edgecolor="white", linewidth=4)
+                )
+                axis.text(col + 0.5, row + 0.39, f"{matrix[row, col]:,}",
+                          ha="center", va="center", fontsize=18, fontweight="bold",
+                          color="#332316")
+                axis.text(col + 0.5, row + 0.68, descriptions[row][col],
+                          ha="center", va="center", fontsize=10, color="#574332")
+        axis.set(xlim=(0, 2), ylim=(2, 0), aspect="equal")
+        axis.set_xticks([0.5, 1.5], ["No", "Yes"])
+        axis.set_yticks([0.5, 1.5], ["No", "Yes"])
+        axis.set_xlabel("Predicted")
+        axis.set_ylabel("Actual")
+        axis.tick_params(length=0)
+        for spine in axis.spines.values():
+            spine.set_visible(False)
+        figure.tight_layout()
+        st.pyplot(figure, use_container_width=True)
         plt.close(figure)
-    with report_tab:
+        st.caption(
+            f"Correct no: {matrix[0, 0]:,}; false positive: {matrix[0, 1]:,}; "
+            f"false negative: {matrix[1, 0]:,}; correct yes: {matrix[1, 1]:,}."
+        )
+    with report_column:
+        st.subheader("Classification report", anchor="classification-report")
+        st.caption("Precision, recall, F1 and support for each class and overall.")
         report = classification_report(
             target, predictions, labels=model.classes_, output_dict=True, zero_division=0
         )
         st.dataframe(pd.DataFrame(report).transpose().round(4), use_container_width=True)
-    with data_tab:
-        st.caption(f"Showing the first {min(25, len(frame)):,} of {len(frame):,} rows.")
+        st.caption("Support is the number of actual examples in each class.")
+
+    st.divider()
+    st.subheader("Data preview", anchor="data-preview")
+    st.caption(f"Showing the first {min(25, len(frame)):,} of {len(frame):,} rows.")
+    with st.expander("Show uploaded rows"):
         st.dataframe(frame.head(25), hide_index=True, use_container_width=True)
 
 
