@@ -78,7 +78,7 @@ def split_features_target(frame: pd.DataFrame, model):
 
 def main() -> None:
     st.set_page_config(page_title="Bank Marketing Classifier Lab", page_icon="🏦")
-    st.title("🏦 Bank Marketing — Term Deposit Classifier Lab")
+    st.title("🏦 Bank Marketing: Term Deposit Classifier Lab")
     st.caption(
         "ML Assignment 2 · UCI Bank Marketing dataset · Five pre-trained "
         "classifiers evaluated on your uploaded test split."
@@ -121,7 +121,7 @@ def main() -> None:
         st.error(f"Cannot evaluate this CSV: {error}")
         st.stop()
 
-    st.subheader(f"Evaluation — {model_name}")
+    st.subheader(f"Evaluation: {model_name}")
     st.write(
         f"Scoring **{len(features):,} rows** with the saved pipeline "
         "(no retraining)."
@@ -144,7 +144,7 @@ def main() -> None:
             confusion_matrix(target, predictions, labels=model.classes_),
             display_labels=model.classes_,
         ).plot(ax=axis, cmap="Blues", colorbar=False)
-        axis.set_title(f"{model_name} — confusion matrix")
+        axis.set_title(f"{model_name}: confusion matrix")
         st.pyplot(figure)
         plt.close(figure)
 

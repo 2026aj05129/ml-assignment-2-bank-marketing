@@ -1,4 +1,4 @@
-# ML Assignment 2 — Bank Term-Deposit Subscription Classifier
+# ML Assignment 2: Bank Term-Deposit Subscription Classifier
 
 ## a. Problem Statement
 
@@ -13,15 +13,15 @@ CSV.
 ## b. Dataset Description
 
 - **Name:** Bank Marketing (`bank-full.csv`)
-- **Source:** [UCI Machine Learning Repository — Bank Marketing](https://archive.ics.uci.edu/dataset/222/bank+marketing)
+- **Source:** [UCI Machine Learning Repository: Bank Marketing](https://archive.ics.uci.edu/dataset/222/bank+marketing)
 - **Size:** 45,211 instances (≥ 500 required ✔)
-- **Features:** 16 input attributes (≥ 12 required ✔) — client data (`age`,
+- **Features:** 16 input attributes (≥ 12 required ✔): client data (`age`,
   `job`, `marital`, `education`, `default`, `balance`, `housing`, `loan`),
   contact data (`contact`, `day`, `month`), and campaign data (`duration`,
   `campaign`, `pdays`, `previous`, `poutcome`)
-- **Target:** `y` — did the client subscribe to a term deposit? (binary:
+- **Target:** `y`: did the client subscribe to a term deposit? (binary:
   `yes` / `no`)
-- **Class balance:** highly imbalanced — about 88.3% `no` vs 11.7% `yes`,
+- **Class balance:** highly imbalanced, about 88.3% `no` vs 11.7% `yes`,
   which is why metrics beyond accuracy (AUC, F1, MCC) matter here.
 - **Leakage handling:** the `duration` column is **excluded** from training.
   Call duration is only known *after* a call finishes, so using it would leak
@@ -79,7 +79,7 @@ results are not an independent estimate of the selected model's performance.
 | Support Vector Machine | 0.8932 | 0.6982 | 0.6503 | 0.1881 | 0.2918 | 0.3105 |
 
 > Note: a majority-class guesser already scores ~88.3% accuracy on this
-> dataset, so accuracy alone is a poor yardstick — AUC, F1, and MCC drive the
+> dataset, so accuracy alone is a poor yardstick; AUC, F1, and MCC drive the
 > conclusions below.
 
 ### Observations
@@ -124,7 +124,7 @@ not just the initial page: model loading only happens after a CSV is uploaded.
 
 ## Streamlit app features
 
-- **Upload** a labeled test CSV (all input features + `y` target) — e.g. the
+- **Upload** a labeled test CSV (all input features + `y` target), e.g. the
   provided `test_data.csv`
 - **Select** any of the five saved models from a dropdown (loaded from
   `model/`, never retrained)
