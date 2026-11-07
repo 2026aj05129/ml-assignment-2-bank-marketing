@@ -1,25 +1,24 @@
-"""Streamlit evaluation app for ML Assignment 2 (UCI Bank Marketing).
+"""Evaluate saved Bank Marketing classifiers on a labeled CSV."""
 
-Loads the five fitted pipelines saved by ``train_models.py`` and evaluates
-whichever one the user picks on an uploaded, labeled test CSV. The app never
-retrains anything: preprocessing and classifiers come straight from the
-``model/`` artifacts.
-"""
-
+import logging
+import pickle
 from pathlib import Path
+import warnings
 
 import joblib
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import streamlit as st
+from sklearn.exceptions import InconsistentVersionWarning
 from sklearn.metrics import ConfusionMatrixDisplay, classification_report, confusion_matrix
+from sklearn.pipeline import Pipeline
 
-from src.data import LEAKAGE_FEATURES, TARGET
 from src.modeling import evaluate_model
+from src.upload import ignored_columns, read_uploaded_csv, split_features_target
 
-PROJECT_DIR = Path(__file__).parent
+PROJECT_DIR = Path(__file__).resolve().parent
 MODEL_DIR = PROJECT_DIR / "model"
+LOGGER = logging.getLogger(__name__)
 
 MODEL_FILES = {
     "Logistic Regression": "logistic_regression.joblib",
@@ -28,133 +27,170 @@ MODEL_FILES = {
     "Gaussian Naive Bayes": "gaussian_naive_bayes.joblib",
     "Support Vector Machine": "support_vector_machine.joblib",
 }
-METRIC_ORDER = ("Accuracy", "AUC", "Precision", "Recall", "F1", "MCC")
+METRIC_HELP = {
+    "Accuracy": "Share of all predictions that are correct.",
+    "AUC": "How well scores rank subscribers above non-subscribers.",
+    "Precision": "Share of predicted subscribers who actually subscribed.",
+    "Recall": "Share of actual subscribers correctly identified.",
+    "F1": "Harmonic mean of precision and recall.",
+    "MCC": "Correlation between predictions and labels, from -1 to 1.",
+}
 
 
-@st.cache_resource(show_spinner="Loading fitted pipeline...")
-def load_model(filename: str):
-    return joblib.load(MODEL_DIR / filename)
-
-
-@st.cache_data(show_spinner=False)
-def read_uploaded_csv(uploaded_bytes: bytes) -> pd.DataFrame:
-    from io import BytesIO
-
-    # test_data.csv is comma-separated; the raw UCI file uses semicolons.
-    frame = pd.read_csv(BytesIO(uploaded_bytes))
-    if frame.shape[1] == 1:
-        frame = pd.read_csv(BytesIO(uploaded_bytes), sep=";")
-    return frame
-
-
-def split_features_target(frame: pd.DataFrame, model):
-    expected = list(model.feature_names_in_)
-    if frame.empty:
-        raise ValueError("The uploaded CSV contains no data rows.")
-    if TARGET not in frame.columns:
-        raise ValueError(
-            f"The uploaded CSV must include the target column `{TARGET}`."
-        )
-    features = frame.drop(
-        columns=[TARGET, *[c for c in LEAKAGE_FEATURES if c in frame.columns]]
-    )
-    missing = [c for c in expected if c not in features.columns]
-    if missing:
-        raise ValueError(f"The uploaded CSV is missing feature columns: {missing}")
-    target = frame[TARGET]
-    if target.isna().any() or set(target.unique()) != set(model.classes_):
-        raise ValueError(
-            "The target column must contain both labels `no` and `yes`, "
-            "without missing or unexpected values. Both classes are needed for AUC."
-        )
-    features = features.loc[:, expected].copy()
-    numeric_columns = model.named_steps["preprocessor"].transformers_[0][2]
-    for column in numeric_columns:
-        features[column] = pd.to_numeric(features[column], errors="raise")
-        if np.isinf(features[column]).any():
-            raise ValueError(f"Numeric feature `{column}` must not contain infinity.")
-    return features, target
+@st.cache_resource(show_spinner="Loading saved model...")
+def load_model(filename: str) -> Pipeline:
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", InconsistentVersionWarning)
+        return joblib.load(MODEL_DIR / filename)
 
 
 def main() -> None:
-    st.set_page_config(page_title="Bank Marketing Classifier Lab", page_icon="🏦")
-    st.title("🏦 Bank Marketing: Term Deposit Classifier Lab")
-    st.caption(
-        "ML Assignment 2 · UCI Bank Marketing dataset · Five pre-trained "
-        "classifiers evaluated on your uploaded test split."
+    st.set_page_config(page_title="Term Deposit Insights", page_icon="📊", layout="wide")
+    st.markdown(
+        """
+        <style>
+        .block-container {padding-top: 5rem; padding-bottom: 3rem;}
+        [data-testid="stMetric"] {
+            background: #fffaf1;
+            border: 1px solid #ead8bc;
+            border-radius: 6px;
+            padding: 1rem;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
     )
+    st.caption("CAMPAIGN INTELLIGENCE / BANK MARKETING")
+    st.title("Term Deposit Insights")
+    st.write(
+        "Investigate how five classification methods identify term-deposit "
+        "subscribers in the UCI Bank Marketing dataset."
+    )
+    st.divider()
+    st.subheader("Set up an analysis")
+    upload_column, model_column = st.columns([3, 2], gap="large")
+    with upload_column:
+        st.markdown("**Campaign test file**")
+        st.caption("Upload a labeled CSV to calculate performance.")
+        uploaded = st.file_uploader("Upload campaign CSV", type="csv")
+        sample_path = PROJECT_DIR / "test_data.csv"
+        if sample_path.is_file():
+            st.download_button(
+                "Download example campaign data",
+                sample_path.read_bytes(),
+                file_name="test_data.csv",
+                mime="text/csv",
+            )
+        else:
+            st.error("Sample test data is missing from the project.")
+    with model_column:
+        st.markdown("**Classification method**")
+        st.caption("Choose a saved model; changing it updates the results.")
+        model_name = st.selectbox("Select a model", list(MODEL_FILES))
+        st.caption("The saved preprocessing and model are used without retraining.")
+        with st.expander("File format and data requirements"):
+            st.write(
+                "Include all 15 trained input columns and the y target. "
+                "Both 'no' and 'yes' labels are needed for AUC. "
+                "Comma- and semicolon-delimited UTF-8 files are supported "
+                "(up to 10 MB and 100,000 rows)."
+            )
+            st.caption(
+                "Missing feature values use the saved imputers. "
+                "Additional columns, including duration, are ignored."
+            )
 
-    missing_models = [f for f in MODEL_FILES.values() if not (MODEL_DIR / f).is_file()]
-    if missing_models:
-        st.error(
-            "Saved pipelines not found. Run `python train_models.py` first to "
-            f"create the `model/` folder. Missing: {missing_models}"
-        )
-        st.stop()
-
-    with st.sidebar:
-        st.header("1 · Upload labeled test data")
-        uploaded = st.file_uploader(
-            "CSV with all input features and the `y` target column "
-            "(for example the repository's `test_data.csv`).",
-            type="csv",
-        )
-        st.header("2 · Pick a classifier")
-        model_name = st.selectbox("Model", list(MODEL_FILES))
-        st.caption(
-            "Pipelines were fitted on an 80% stratified training split; the "
-            "`duration` column is excluded to avoid target leakage."
-        )
-
+    st.divider()
     if uploaded is None:
-        st.info(
-            "⬅️ Upload a labeled test CSV to begin. Tip: `test_data.csv` in the "
-            "repository is the 20% holdout split produced by `train_models.py`."
+        st.subheader("Campaign dataset")
+        for column, label, value in zip(
+            st.columns(4),
+            ("Dataset rows", "Model inputs", "Classifiers", "Holdout rows"),
+            ("45,211", "15", "5", "9,043"),
+            strict=True,
+        ):
+            column.metric(label, value)
+        st.info("Upload campaign data above to see metrics and classification results.")
+        st.subheader("Benchmark performance")
+        st.caption(
+            "Results from the original holdout split, not necessarily from an uploaded file. "
+            "The positive class is 'yes'."
         )
-        st.stop()
+        results_path = PROJECT_DIR / "results" / "metrics.csv"
+        if results_path.is_file():
+            st.dataframe(
+                pd.read_csv(results_path).round(4),
+                hide_index=True,
+                use_container_width=True,
+            )
+        else:
+            st.error("Recorded holdout metrics are missing from the project.")
+        return
 
-    model = load_model(MODEL_FILES[model_name])
+    try:
+        model = load_model(MODEL_FILES[model_name])
+    except (
+        OSError, EOFError, pickle.UnpicklingError, InconsistentVersionWarning,
+        ImportError, AttributeError, ValueError,
+    ):
+        LOGGER.exception("Failed to load saved model %s", model_name)
+        st.error(
+            "Could not load the saved model. Check that the model file is present "
+            "and that Python 3.12 and the pinned dependencies are installed."
+        )
+        return
+
     try:
         frame = read_uploaded_csv(uploaded.getvalue())
         features, target = split_features_target(frame, model)
-    except (ValueError, pd.errors.ParserError, UnicodeDecodeError) as error:
+    except (ValueError, pd.errors.ParserError) as error:
         st.error(f"Cannot evaluate this CSV: {error}")
-        st.stop()
+        return
 
-    st.subheader(f"Evaluation: {model_name}")
+    extra = ignored_columns(frame, model)
+    if extra:
+        st.info(f"Ignored columns not used by the model: {', '.join(extra)}.")
+    try:
+        with st.spinner("Evaluating the selected model..."):
+            metrics = evaluate_model(model, features, target)
+            predictions = model.predict(features)
+    except (ValueError, TypeError) as error:
+        LOGGER.exception("Failed to evaluate model %s", model_name)
+        st.error(f"Evaluation failed. Check the CSV feature values: {error}")
+        return
+
+    st.subheader("Performance summary")
     st.write(
-        f"Scoring **{len(features):,} rows** with the saved pipeline "
-        "(no retraining)."
+        f"**{model_name}** | {len(features):,} rows | "
+        f"{int((target == 'no').sum()):,} no | {int((target == 'yes').sum()):,} yes"
     )
+    st.caption("Positive class: yes. Metrics use the uploaded labels and saved pipeline.")
+    for row in (list(metrics.items())[:3], list(metrics.items())[3:]):
+        for column, (name, value) in zip(st.columns(3), row, strict=True):
+            column.metric(name, f"{value:.4f}", help=METRIC_HELP[name])
 
-    metrics = evaluate_model(model, features, target)
-    columns = st.columns(3)
-    for i, name in enumerate(METRIC_ORDER):
-        columns[i % 3].metric(name, f"{metrics[name]:.4f}")
-
-    predictions = model.predict(features)
-
-    tab_cm, tab_report, tab_data = st.tabs(
+    matrix_tab, report_tab, data_tab = st.tabs(
         ["Confusion matrix", "Classification report", "Data preview"]
     )
-
-    with tab_cm:
+    with matrix_tab:
+        matrix = confusion_matrix(target, predictions, labels=model.classes_)
+        st.caption("Rows are actual labels; columns are predicted labels.")
+        st.write(
+            f"**Correct no:** {matrix[0, 0]:,} | **Correct yes:** {matrix[1, 1]:,} | "
+            f"**False positives:** {matrix[0, 1]:,} | **False negatives:** {matrix[1, 0]:,}"
+        )
         figure, axis = plt.subplots(figsize=(5, 4))
-        ConfusionMatrixDisplay(
-            confusion_matrix(target, predictions, labels=model.classes_),
-            display_labels=model.classes_,
-        ).plot(ax=axis, cmap="Blues", colorbar=False)
-        axis.set_title(f"{model_name}: confusion matrix")
-        st.pyplot(figure)
+        ConfusionMatrixDisplay(matrix, display_labels=model.classes_        ).plot(ax=axis, cmap="YlOrBr", colorbar=False)
+        st.pyplot(figure, use_container_width=False)
         plt.close(figure)
-
-    with tab_report:
-        report = classification_report(target, predictions, output_dict=True, zero_division=0)
+    with report_tab:
+        report = classification_report(
+            target, predictions, labels=model.classes_, output_dict=True, zero_division=0
+        )
         st.dataframe(pd.DataFrame(report).transpose().round(4), use_container_width=True)
-
-    with tab_data:
-        st.dataframe(frame.head(25), use_container_width=True)
-        st.caption(f"Showing the first 25 of {len(frame):,} uploaded rows.")
+    with data_tab:
+        st.caption(f"Showing the first {min(25, len(frame)):,} of {len(frame):,} rows.")
+        st.dataframe(frame.head(25), hide_index=True, use_container_width=True)
 
 
 if __name__ == "__main__":
