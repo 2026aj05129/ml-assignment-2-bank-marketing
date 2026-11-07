@@ -38,9 +38,10 @@ def test_uploaded_holdout_matches_recorded_metrics(monkeypatch, model_name):
         )
     assert len(app.dataframe) == 2
     assert not app.tabs
-    assert {"Performance summary", "Confusion matrix", "Classification report", "Data preview"} <= {
+    assert {"Performance summary", "Confusion matrix", "Classification report"} <= {
         heading.value for heading in app.subheader
     }
+    assert "Data preview" in [expander.label for expander in app.expander]
     frame = pd.read_csv(PROJECT_DIR / "test_data.csv")
     model_filename = model_name.lower().replace(" ", "_").replace("-", "") + ".joblib"
     model = joblib.load(PROJECT_DIR / "model" / model_filename)

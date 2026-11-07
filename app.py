@@ -2,6 +2,7 @@
 
 import logging
 import pickle
+from io import BytesIO
 from pathlib import Path
 import warnings
 
@@ -45,53 +46,40 @@ def load_model(filename: str) -> Pipeline:
 
 
 def main() -> None:
-    st.set_page_config(page_title="Term Deposit Insights", page_icon="📊", layout="wide")
+    st.set_page_config(
+        page_title="Term Deposit Insights", page_icon="📊",
+        layout="wide", initial_sidebar_state="expanded",
+    )
     st.markdown(
         """
         <style>
-        .block-container {padding-top: 5rem; padding-bottom: 3rem;}
+        .block-container {padding-top: 4rem; padding-bottom: 2rem;}
         [data-testid="stMetric"] {
             background: #fffaf1;
             border: 1px solid #ead8bc;
             border-radius: 6px;
-            padding: 1rem;
+            padding: 0.6rem;
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
-    st.caption("CAMPAIGN INTELLIGENCE / BANK MARKETING")
-    st.title("Term Deposit Insights")
-    st.write(
-        "Investigate how five classification methods identify term-deposit "
-        "subscribers in the UCI Bank Marketing dataset."
-    )
-    st.caption(
-        "After upload: six evaluation metrics, a confusion matrix and a "
-        "classification report appear together below."
-    )
-    st.divider()
-    st.subheader("Set up an analysis")
-    upload_column, model_column = st.columns([3, 2], gap="large")
-    with upload_column:
-        st.markdown("**Campaign test file**")
-        st.caption("Upload a labeled CSV to calculate performance.")
+    with st.sidebar:
+        st.header("Campaign workspace")
+        st.caption("Evaluate saved models on labeled test data.")
+        model_name = st.selectbox("Classification method", list(MODEL_FILES))
         uploaded = st.file_uploader("Upload campaign CSV", type="csv")
         sample_path = PROJECT_DIR / "test_data.csv"
         if sample_path.is_file():
             st.download_button(
-                "Download example campaign data",
+                "Download sample CSV",
                 sample_path.read_bytes(),
                 file_name="test_data.csv",
                 mime="text/csv",
+                use_container_width=True,
             )
         else:
             st.error("Sample test data is missing from the project.")
-    with model_column:
-        st.markdown("**Classification method**")
-        st.caption("Choose a saved model; changing it updates the results.")
-        model_name = st.selectbox("Select a model", list(MODEL_FILES))
-        st.caption("The saved preprocessing and model are used without retraining.")
         with st.expander("File format and data requirements"):
             st.write(
                 "Include all 15 trained input columns and the y target. "
@@ -103,8 +91,10 @@ def main() -> None:
                 "Missing feature values use the saved imputers. "
                 "Additional columns, including duration, are ignored."
             )
+        st.caption("Saved models are evaluated without retraining.")
 
-    st.divider()
+    st.title("Term Deposit Insights")
+    st.caption("UCI Bank Marketing | Model evaluation dashboard")
     if uploaded is None:
         st.subheader("Campaign dataset")
         for column, label, value in zip(
@@ -114,7 +104,7 @@ def main() -> None:
             strict=True,
         ):
             column.metric(label, value)
-        st.info("Upload campaign data above to see metrics and classification results.")
+        st.info("Upload a labeled CSV using the left panel to evaluate a model.")
         st.subheader("Benchmark performance")
         st.caption(
             "Results from the original holdout split, not necessarily from an uploaded file. "
@@ -163,29 +153,21 @@ def main() -> None:
         st.error(f"Evaluation failed. Check the CSV feature values: {error}")
         return
 
-    st.subheader("Performance summary", anchor="performance-summary")
     st.write(
         f"**{model_name}** | {len(features):,} rows | "
         f"{int((target == 'no').sum()):,} no | {int((target == 'yes').sum()):,} yes"
     )
+    st.subheader("Performance summary")
+    for column, (name, value) in zip(st.columns(6), metrics.items(), strict=True):
+        column.metric(name, f"{value:.4f}", help=METRIC_HELP[name])
     st.caption("Positive class: yes. Metrics use the uploaded labels and saved pipeline.")
-    st.markdown(
-        "**Explore results:** [Performance](#performance-summary) | "
-        "[Confusion matrix](#confusion-matrix) | "
-        "[Classification report](#classification-report) | "
-        "[Data preview](#data-preview)"
-    )
-    for row in (list(metrics.items())[:3], list(metrics.items())[3:]):
-        for column, (name, value) in zip(st.columns(3), row, strict=True):
-            column.metric(name, f"{value:.4f}", help=METRIC_HELP[name])
 
-    st.divider()
     matrix_column, report_column = st.columns(2, gap="large")
     with matrix_column:
         st.subheader("Confusion matrix", anchor="confusion-matrix")
         matrix = confusion_matrix(target, predictions, labels=model.classes_)
         st.caption("Actual labels run down the rows; predictions run across the columns.")
-        figure, axis = plt.subplots(figsize=(6, 4))
+        figure, axis = plt.subplots(figsize=(4.2, 2.8))
         figure.patch.set_facecolor("#fffcf6")
         axis.set_facecolor("#fffcf6")
         descriptions = (
@@ -213,8 +195,10 @@ def main() -> None:
         for spine in axis.spines.values():
             spine.set_visible(False)
         figure.tight_layout()
-        st.pyplot(figure, use_container_width=True)
+        image = BytesIO()
+        figure.savefig(image, format="png", dpi=100, bbox_inches="tight")
         plt.close(figure)
+        st.image(image.getvalue(), width=270, caption="Confusion matrix: actual vs predicted")
         st.caption(
             f"Correct no: {matrix[0, 0]:,}; false positive: {matrix[0, 1]:,}; "
             f"false negative: {matrix[1, 0]:,}; correct yes: {matrix[1, 1]:,}."
@@ -225,13 +209,15 @@ def main() -> None:
         report = classification_report(
             target, predictions, labels=model.classes_, output_dict=True, zero_division=0
         )
-        st.dataframe(pd.DataFrame(report).transpose().round(4), use_container_width=True)
+        st.dataframe(
+            pd.DataFrame(report).transpose().round(4),
+            use_container_width=True,
+            height=230,
+        )
         st.caption("Support is the number of actual examples in each class.")
 
-    st.divider()
-    st.subheader("Data preview", anchor="data-preview")
-    st.caption(f"Showing the first {min(25, len(frame)):,} of {len(frame):,} rows.")
-    with st.expander("Show uploaded rows"):
+    with st.expander("Data preview"):
+        st.caption(f"Showing the first {min(25, len(frame)):,} of {len(frame):,} rows.")
         st.dataframe(frame.head(25), hide_index=True, use_container_width=True)
 
 
