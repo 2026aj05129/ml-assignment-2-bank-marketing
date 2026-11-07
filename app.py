@@ -48,12 +48,13 @@ def load_model(filename: str) -> Pipeline:
 def main() -> None:
     st.set_page_config(
         page_title="Term Deposit Insights", page_icon="📊",
-        layout="wide", initial_sidebar_state="expanded",
+        layout="wide",
     )
     st.markdown(
         """
         <style>
         .block-container {padding-top: 4rem; padding-bottom: 2rem;}
+        [data-testid="stVerticalBlock"] {gap: 0.6rem;}
         [data-testid="stMetric"] {
             background: #fffaf1;
             border: 1px solid #ead8bc;
@@ -64,11 +65,22 @@ def main() -> None:
         """,
         unsafe_allow_html=True,
     )
-    with st.sidebar:
-        st.header("Campaign workspace")
-        st.caption("Evaluate saved models on labeled test data.")
+    st.title("Term Deposit Insights")
+    st.caption("UCI Bank Marketing | Select a model and upload labeled campaign data")
+    model_column, upload_column, sample_column = st.columns([3, 3, 2], gap="medium")
+    with model_column:
         model_name = st.selectbox("Classification method", list(MODEL_FILES))
-        uploaded = st.file_uploader("Upload campaign CSV", type="csv")
+    with upload_column:
+        with st.popover("Upload or change CSV", use_container_width=True):
+            uploaded = st.file_uploader("Upload campaign CSV", type="csv")
+            st.caption(
+                "Include all 15 trained inputs and both target labels, no and yes. "
+                "UTF-8 comma- or semicolon-delimited CSV, up to 10 MB and "
+                "100,000 rows. Missing feature values use the saved imputers; "
+                "extra columns including duration are ignored."
+            )
+        st.caption("CSV uploaded" if uploaded is not None else "No CSV uploaded")
+    with sample_column:
         sample_path = PROJECT_DIR / "test_data.csv"
         if sample_path.is_file():
             st.download_button(
@@ -80,21 +92,6 @@ def main() -> None:
             )
         else:
             st.error("Sample test data is missing from the project.")
-        with st.expander("File format and data requirements"):
-            st.write(
-                "Include all 15 trained input columns and the y target. "
-                "Both 'no' and 'yes' labels are needed for AUC. "
-                "Comma- and semicolon-delimited UTF-8 files are supported "
-                "(up to 10 MB and 100,000 rows)."
-            )
-            st.caption(
-                "Missing feature values use the saved imputers. "
-                "Additional columns, including duration, are ignored."
-            )
-        st.caption("Saved models are evaluated without retraining.")
-
-    st.title("Term Deposit Insights")
-    st.caption("UCI Bank Marketing | Model evaluation dashboard")
     if uploaded is None:
         st.subheader("Campaign dataset")
         for column, label, value in zip(
@@ -104,7 +101,7 @@ def main() -> None:
             strict=True,
         ):
             column.metric(label, value)
-        st.info("Upload a labeled CSV using the left panel to evaluate a model.")
+        st.info("Select 'Upload or change CSV' above to evaluate the selected model.")
         st.subheader("Benchmark performance")
         st.caption(
             "Results from the original holdout split, not necessarily from an uploaded file. "
@@ -155,18 +152,16 @@ def main() -> None:
 
     st.write(
         f"**{model_name}** | {len(features):,} rows | "
-        f"{int((target == 'no').sum()):,} no | {int((target == 'yes').sum()):,} yes"
+        f"{int((target == 'no').sum()):,} no | {int((target == 'yes').sum()):,} yes "
+        "| positive class: yes"
     )
     st.subheader("Performance summary")
     for column, (name, value) in zip(st.columns(6), metrics.items(), strict=True):
         column.metric(name, f"{value:.4f}", help=METRIC_HELP[name])
-    st.caption("Positive class: yes. Metrics use the uploaded labels and saved pipeline.")
-
     matrix_column, report_column = st.columns(2, gap="large")
     with matrix_column:
         st.subheader("Confusion matrix", anchor="confusion-matrix")
         matrix = confusion_matrix(target, predictions, labels=model.classes_)
-        st.caption("Actual labels run down the rows; predictions run across the columns.")
         figure, axis = plt.subplots(figsize=(4.2, 2.8))
         figure.patch.set_facecolor("#fffcf6")
         axis.set_facecolor("#fffcf6")
@@ -198,14 +193,13 @@ def main() -> None:
         image = BytesIO()
         figure.savefig(image, format="png", dpi=100, bbox_inches="tight")
         plt.close(figure)
-        st.image(image.getvalue(), width=270, caption="Confusion matrix: actual vs predicted")
+        st.image(image.getvalue(), width=240)
         st.caption(
             f"Correct no: {matrix[0, 0]:,}; false positive: {matrix[0, 1]:,}; "
             f"false negative: {matrix[1, 0]:,}; correct yes: {matrix[1, 1]:,}."
         )
     with report_column:
         st.subheader("Classification report", anchor="classification-report")
-        st.caption("Precision, recall, F1 and support for each class and overall.")
         report = classification_report(
             target, predictions, labels=model.classes_, output_dict=True, zero_division=0
         )

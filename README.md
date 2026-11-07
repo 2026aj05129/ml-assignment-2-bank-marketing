@@ -134,7 +134,7 @@ not just the initial page: model loading only happens after a CSV is uploaded.
 - **View** all six evaluation metrics: Accuracy, AUC, Precision, Recall, F1, MCC
 - **Inspect** the labeled confusion matrix and full classification report
   together below the metrics, with a collapsible preview of the uploaded data.
-  The left panel keeps model selection and CSV upload available.
+  Model selection and CSV upload are available above the results.
 - **Validate** required columns, duplicate headers, labels and numeric values.
   Missing feature values are handled by the fitted imputers. Extra columns,
   including `duration`, are ignored and listed in the app.

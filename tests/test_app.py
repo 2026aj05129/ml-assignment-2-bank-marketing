@@ -153,6 +153,8 @@ def test_landing_page_shows_summary_without_model_loading():
         "Dataset rows", "Model inputs", "Classifiers", "Holdout rows"
     ]
     assert len(app.selectbox[0].options) == 5
+    assert len(app.sidebar.selectbox) == 0
+    assert len(app.get("popover")) == 1
 
 
 @pytest.mark.parametrize("content", [b"", b"\xff", b"age,age,y\n1,2,no\n"])
