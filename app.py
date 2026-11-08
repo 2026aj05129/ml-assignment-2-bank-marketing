@@ -50,7 +50,7 @@ def reset_upload() -> None:
 
 def main() -> None:
     st.set_page_config(
-        page_title="Term Deposit Insights", page_icon="📊",
+        page_title="Bank Marketing Classifier", page_icon="📊",
         layout="wide",
     )
     st.markdown(
@@ -165,7 +165,7 @@ def main() -> None:
         """,
         unsafe_allow_html=True,
     )
-    st.title("Term Deposit Insights")
+    st.title("Bank Marketing: Term Deposit Classification")
     st.caption("UCI Bank Marketing | Upload labeled campaign data and select a model")
     model_column, upload_column, sample_column = st.columns([3, 3, 2], gap="medium")
     with upload_column:
@@ -211,7 +211,11 @@ def main() -> None:
         else:
             st.error("Sample test data is missing from the project.")
         if uploaded is not None:
-            st.button("Back to overview", on_click=reset_upload, use_container_width=True)
+            st.button(
+                "← Back to overview",
+                help="Clear the selected CSV and return to the dataset overview.",
+                on_click=reset_upload,
+            )
     if uploaded is None:
         st.subheader("Campaign dataset")
         for column, label, value in zip(

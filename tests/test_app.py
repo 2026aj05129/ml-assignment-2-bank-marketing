@@ -197,6 +197,7 @@ def test_extra_columns_and_missing_features_are_handled():
 def test_landing_page_shows_summary_without_model_loading():
     app = AppTest.from_file(str(PROJECT_DIR / "app.py")).run()
     assert not app.exception
+    assert app.title[0].value == "Bank Marketing: Term Deposit Classification"
     assert [metric.label for metric in app.metric] == [
         "Dataset rows", "Model inputs", "Classifiers", "Holdout rows"
     ]
@@ -240,7 +241,7 @@ def test_back_to_overview_clears_selected_upload(monkeypatch, valid):
     )
     app = AppTest.from_file(str(PROJECT_DIR / "app.py")).run(timeout=120)
     assert not app.exception
-    assert app.button[0].label == "Back to overview"
+    assert app.button[0].label == "← Back to overview"
     app.button[0].click().run(timeout=120)
     assert not app.exception
     assert app.selectbox[0].disabled
