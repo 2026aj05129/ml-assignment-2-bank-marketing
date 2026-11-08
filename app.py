@@ -170,11 +170,11 @@ def main() -> None:
                 unsafe_allow_html=True,
             )
     with sample_column:
-        st.caption("Example data")
+        st.caption("Test data")
         sample_path = PROJECT_DIR / "test_data.csv"
         if sample_path.is_file():
             st.download_button(
-                "Download sample CSV",
+                "Download test CSV",
                 sample_path.read_bytes(),
                 file_name="test_data.csv",
                 mime="text/csv",
