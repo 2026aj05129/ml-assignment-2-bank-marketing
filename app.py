@@ -139,7 +139,7 @@ def main() -> None:
                 "100,000 rows. Missing feature values use the saved imputers; "
                 "extra columns including duration are ignored."
             )
-        st.caption("CSV uploaded" if uploaded is not None else "No CSV uploaded")
+        st.caption("CSV selected" if uploaded is not None else "No CSV selected")
     with sample_column:
         st.caption("Example data")
         sample_path = PROJECT_DIR / "test_data.csv"
@@ -246,10 +246,17 @@ def main() -> None:
         report_table = pd.DataFrame(
             {name: values for name, values in report.items() if name != "accuracy"}
         ).transpose().round(4)
+        report_table.index.name = "Class / average"
+        report_table["support"] = report_table["support"].astype(int)
         st.dataframe(
             report_table,
             use_container_width=True,
-            height=230,
+            column_config={
+                "precision": st.column_config.NumberColumn("Precision", format="%.4f"),
+                "recall": st.column_config.NumberColumn("Recall", format="%.4f"),
+                "f1-score": st.column_config.NumberColumn("F1-score", format="%.4f"),
+                "support": st.column_config.NumberColumn("Support", format="%d"),
+            },
         )
         st.caption(
             "Support is the number of actual examples in each class. "

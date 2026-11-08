@@ -78,11 +78,14 @@ def test_uploaded_holdout_matches_recorded_metrics(monkeypatch, model_name):
     expected_report = pd.DataFrame(
         {name: values for name, values in report.items() if name != "accuracy"}
     ).transpose().round(4)
+    expected_report.index.name = "Class / average"
+    expected_report["support"] = expected_report["support"].astype(int)
     pd.testing.assert_frame_equal(
         app.dataframe[0].value, expected_report
     )
     assert "accuracy" not in app.dataframe[0].value.index
     assert app.dataframe[0].value.loc["weighted avg", "support"] == len(target)
+    assert app.dataframe[0].proto.height == 0
     assert any("Overall accuracy is shown" in caption.value for caption in app.caption)
 
 
