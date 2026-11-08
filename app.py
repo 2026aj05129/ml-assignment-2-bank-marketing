@@ -94,7 +94,7 @@ def main() -> None:
         }
         .matrix-grid {
             display: grid;
-            grid-template-columns: minmax(3.5rem, 0.42fr) repeat(2, minmax(0, 1fr));
+            grid-template-columns: 3.5rem repeat(2, minmax(0, 1fr));
             gap: 0.3rem;
             align-items: stretch;
             width: 100%;
@@ -106,7 +106,8 @@ def main() -> None:
             text-align: center;
             align-self: center;
         }
-        .matrix-axis.predicted {grid-column: 2 / 4;}
+        .matrix-axis.row-label {text-align: left;}
+        .matrix-axis.header {min-height: 2rem;}
         .matrix-cell {
             border: 1px solid #a4c9bd;
             background: #e8f2ef;
@@ -264,17 +265,17 @@ def main() -> None:
         matrix = confusion_matrix(target, predictions, labels=["yes", "no"])
         st.markdown(
             '<div class="matrix-grid" aria-hidden="true">'
-            '<div class="matrix-axis">ACTUAL</div>'
-            '<div class="matrix-axis predicted">PREDICTED</div>'
-            '<div></div><div class="matrix-axis">YES</div><div class="matrix-axis">NO</div>'
-            '<div class="matrix-axis">YES</div>'
+            '<div class="matrix-axis row-label header">ACTUAL</div>'
+            '<div class="matrix-axis header">PREDICTED YES</div>'
+            '<div class="matrix-axis header">PREDICTED NO</div>'
+            '<div class="matrix-axis row-label">YES</div>'
             f'<div class="matrix-cell"><span class="matrix-code">TP</span>'
             f'<span class="matrix-count">{matrix[0, 0]:,}</span>'
             '<span class="matrix-description">True positive</span></div>'
             f'<div class="matrix-cell error"><span class="matrix-code">FN</span>'
             f'<span class="matrix-count">{matrix[0, 1]:,}</span>'
             '<span class="matrix-description">False negative</span></div>'
-            '<div class="matrix-axis">NO</div>'
+            '<div class="matrix-axis row-label">NO</div>'
             f'<div class="matrix-cell error"><span class="matrix-code">FP</span>'
             f'<span class="matrix-count">{matrix[1, 0]:,}</span>'
             '<span class="matrix-description">False positive</span></div>'

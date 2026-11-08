@@ -64,6 +64,7 @@ def test_uploaded_holdout_matches_recorded_metrics(monkeypatch, model_name):
     predictions = model.predict(features)
     matrix = confusion_matrix(target, predictions, labels=["yes", "no"])
     matrix_html = next(item.value for item in app.markdown if 'class="matrix-grid"' in item.value)
+    assert all(label in matrix_html for label in ("ACTUAL", "PREDICTED YES", "PREDICTED NO"))
     for code, count, label in (
         ("TP", matrix[0, 0], "True positive"),
         ("FN", matrix[0, 1], "False negative"),
