@@ -71,6 +71,7 @@ def main() -> None:
     with model_column:
         model_name = st.selectbox("Classification method", list(MODEL_FILES))
     with upload_column:
+        st.caption("Evaluation data")
         with st.popover("Upload or change CSV", use_container_width=True):
             uploaded = st.file_uploader("Upload campaign CSV", type="csv")
             st.caption(
@@ -81,6 +82,7 @@ def main() -> None:
             )
         st.caption("CSV uploaded" if uploaded is not None else "No CSV uploaded")
     with sample_column:
+        st.caption("Example data")
         sample_path = PROJECT_DIR / "test_data.csv"
         if sample_path.is_file():
             st.download_button(
@@ -161,31 +163,37 @@ def main() -> None:
     matrix_column, report_column = st.columns(2, gap="large")
     with matrix_column:
         st.subheader("Confusion matrix", anchor="confusion-matrix")
-        matrix = confusion_matrix(target, predictions, labels=model.classes_)
-        figure, axis = plt.subplots(figsize=(4.2, 2.8))
+        matrix = confusion_matrix(target, predictions, labels=["yes", "no"])
+        figure, axis = plt.subplots(figsize=(4.6, 3.2))
         figure.patch.set_facecolor("#fffcf6")
         axis.set_facecolor("#fffcf6")
         descriptions = (
-            ("Correct no", "False positive"),
-            ("False negative", "Correct yes"),
+            ("True positive (TP)", "False negative (FN)"),
+            ("False positive (FP)", "True negative (TN)"),
         )
-        colors = (("#e6f0e2", "#fbe8d5"), ("#fbe8d5", "#e6f0e2"))
+        colors = (("#dcebe3", "#f9e3ce"), ("#f9e3ce", "#dcebe3"))
         for row in range(2):
             for col in range(2):
                 axis.add_patch(
-                    plt.Rectangle((col, row), 1, 1, facecolor=colors[row][col],
-                                  edgecolor="white", linewidth=4)
+                    plt.Rectangle(
+                        (col, row), 1, 1, facecolor=colors[row][col],
+                        edgecolor="#fffcf6", linewidth=5,
+                    )
                 )
-                axis.text(col + 0.5, row + 0.39, f"{matrix[row, col]:,}",
-                          ha="center", va="center", fontsize=18, fontweight="bold",
-                          color="#332316")
-                axis.text(col + 0.5, row + 0.68, descriptions[row][col],
-                          ha="center", va="center", fontsize=10, color="#574332")
+                axis.text(
+                    col + 0.5, row + 0.35, f"{matrix[row, col]:,}",
+                    ha="center", va="center", fontsize=20, fontweight="bold",
+                    color="#1e3a32",
+                )
+                axis.text(
+                    col + 0.5, row + 0.68, descriptions[row][col],
+                    ha="center", va="center", fontsize=9, color="#332316",
+                )
         axis.set(xlim=(0, 2), ylim=(2, 0), aspect="equal")
-        axis.set_xticks([0.5, 1.5], ["No", "Yes"])
-        axis.set_yticks([0.5, 1.5], ["No", "Yes"])
-        axis.set_xlabel("Predicted")
-        axis.set_ylabel("Actual")
+        axis.set_xticks([0.5, 1.5], ["Yes", "No"])
+        axis.set_yticks([0.5, 1.5], ["Yes", "No"])
+        axis.set_xlabel("Predicted class")
+        axis.set_ylabel("Actual class")
         axis.tick_params(length=0)
         for spine in axis.spines.values():
             spine.set_visible(False)
@@ -193,10 +201,11 @@ def main() -> None:
         image = BytesIO()
         figure.savefig(image, format="png", dpi=100, bbox_inches="tight")
         plt.close(figure)
-        st.image(image.getvalue(), width=240)
+        st.image(image.getvalue(), width=300)
         st.caption(
-            f"Correct no: {matrix[0, 0]:,}; false positive: {matrix[0, 1]:,}; "
-            f"false negative: {matrix[1, 0]:,}; correct yes: {matrix[1, 1]:,}."
+            f"TP: {matrix[0, 0]:,}; FN: {matrix[0, 1]:,}; "
+            f"FP: {matrix[1, 0]:,}; TN: {matrix[1, 1]:,}. "
+            "Positive class: yes."
         )
     with report_column:
         st.subheader("Classification report", anchor="classification-report")

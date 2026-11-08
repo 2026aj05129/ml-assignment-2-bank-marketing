@@ -47,10 +47,15 @@ def test_uploaded_holdout_matches_recorded_metrics(monkeypatch, model_name):
     model = joblib.load(PROJECT_DIR / "model" / model_filename)
     features, target = split_features_target(frame, model)
     predictions = model.predict(features)
-    matrix = confusion_matrix(target, predictions, labels=model.classes_)
+    matrix = confusion_matrix(target, predictions, labels=["yes", "no"])
     assert any(
-        f"false negative: {matrix[1, 0]:,}" in caption.value
-        and f"correct yes: {matrix[1, 1]:,}" in caption.value
+        all(
+            item in caption.value
+            for item in (
+                f"TP: {matrix[0, 0]:,}", f"FN: {matrix[0, 1]:,}",
+                f"FP: {matrix[1, 0]:,}", f"TN: {matrix[1, 1]:,}",
+            )
+        )
         for caption in app.caption
     )
     report = classification_report(

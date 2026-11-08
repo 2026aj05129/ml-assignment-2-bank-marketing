@@ -135,6 +135,8 @@ not just the initial page: model loading only happens after a CSV is uploaded.
 - **Inspect** the labeled confusion matrix and full classification report
   together below the metrics, with a collapsible preview of the uploaded data.
   Model selection and CSV upload are available above the results.
+  The matrix uses `yes` as positive: rows are actual labels, columns are
+  predicted labels, and its cells show TP, FN, FP and TN.
 - **Validate** required columns, duplicate headers, labels and numeric values.
   Missing feature values are handled by the fitted imputers. Extra columns,
   including `duration`, are ignored and listed in the app.
