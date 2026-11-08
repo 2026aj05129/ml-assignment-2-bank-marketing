@@ -98,6 +98,10 @@ def main() -> None:
             gap: 0.3rem;
             align-items: stretch;
             width: 100%;
+            border: 1px solid #ead8bc;
+            border-radius: 6px;
+            padding: 0.3rem;
+            background: #fffaf1;
         }
         .matrix-axis {
             color: #655749;
@@ -107,7 +111,15 @@ def main() -> None:
             align-self: center;
         }
         .matrix-axis.row-label {text-align: left;}
-        .matrix-axis.header {min-height: 2rem;}
+        .matrix-axis.header {
+            min-height: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f4ede2;
+            border-radius: 4px;
+        }
+        .matrix-axis.row-label.header {justify-content: flex-start; padding-left: 0.25rem;}
         .matrix-cell {
             border: 1px solid #a4c9bd;
             background: #e8f2ef;
