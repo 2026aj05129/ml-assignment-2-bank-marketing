@@ -201,9 +201,33 @@ def test_landing_page_shows_summary_without_model_loading():
         "Dataset rows", "Model inputs", "Classifiers", "Holdout rows"
     ]
     assert len(app.selectbox[0].options) == 5
+    assert app.selectbox[0].disabled
     assert len(app.sidebar.selectbox) == 0
     assert len(app.get("popover")) == 1
     assert any(item.value == "No CSV selected" for item in app.caption)
+    assert any(item.value == "Upload a CSV to choose a model." for item in app.caption)
+
+
+def test_model_selection_tracks_upload_and_changes_results(monkeypatch):
+    selected = [None]
+    monkeypatch.setattr(st, "file_uploader", lambda *args, **kwargs: selected[0])
+    app = AppTest.from_file(str(PROJECT_DIR / "app.py")).run()
+    assert app.selectbox[0].disabled
+    selected[0] = named_upload((PROJECT_DIR / "test_data.csv").read_bytes())
+    app.run(timeout=120)
+    assert not app.exception
+    assert not app.selectbox[0].disabled
+    app.selectbox[0].select("Decision Tree").run(timeout=120)
+    assert not app.exception
+    assert app.selectbox[0].value == "Decision Tree"
+    assert float(app.metric[0].value) == pytest.approx(0.8308)
+    selected[0] = None
+    app.run(timeout=120)
+    assert not app.exception
+    assert app.selectbox[0].disabled
+    assert [metric.label for metric in app.metric] == [
+        "Dataset rows", "Model inputs", "Classifiers", "Holdout rows"
+    ]
 
 
 def test_selected_filename_is_escaped_even_for_invalid_csv(monkeypatch):
@@ -212,6 +236,7 @@ def test_selected_filename_is_escaped_even_for_invalid_csv(monkeypatch):
     app = AppTest.from_file(str(PROJECT_DIR / "app.py")).run()
     assert not app.exception
     assert len(app.error) == 1
+    assert not app.selectbox[0].disabled
     assert any(
         'CSV selected: a&quot;&lt;tag&gt;.csv' in item.value
         for item in app.markdown

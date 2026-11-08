@@ -130,7 +130,8 @@ not just the initial page: model loading only happens after a CSV is uploaded.
   comma- or semicolon-delimited, no larger than 10 MB and at most 100,000 rows.
   The target must contain both `no` and `yes` to compute AUC.
 - **Select** any of the five saved models from a dropdown (loaded from
-  `model/`, never retrained)
+  `model/`, never retrained). The dropdown becomes available once a CSV is
+  selected; the file must pass validation before results appear.
 - **View** all six evaluation metrics: Accuracy, AUC, Precision, Recall, F1, MCC
 - **Inspect** the labeled confusion matrix and full classification report
   together below the metrics, with a collapsible preview of the uploaded data.

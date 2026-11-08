@@ -162,13 +162,8 @@ def main() -> None:
         unsafe_allow_html=True,
     )
     st.title("Term Deposit Insights")
-    st.caption("UCI Bank Marketing | Select a model and upload labeled campaign data")
+    st.caption("UCI Bank Marketing | Upload labeled campaign data and select a model")
     model_column, upload_column, sample_column = st.columns([3, 3, 2], gap="medium")
-    with model_column:
-        st.caption("Classification method")
-        model_name = st.selectbox(
-            "Classification method", list(MODEL_FILES), label_visibility="collapsed"
-        )
     with upload_column:
         st.caption("Evaluation data")
         with st.popover("Upload or change CSV", use_container_width=True):
@@ -187,6 +182,14 @@ def main() -> None:
                 f'<div class="upload-status" title="{filename}">CSV selected: {filename}</div>',
                 unsafe_allow_html=True,
             )
+    with model_column:
+        st.caption("Classification method")
+        model_name = st.selectbox(
+            "Classification method", list(MODEL_FILES),
+            label_visibility="collapsed", disabled=uploaded is None,
+        )
+        if uploaded is None:
+            st.caption("Upload a CSV to choose a model.")
     with sample_column:
         st.caption("Test data")
         sample_path = PROJECT_DIR / "test_data.csv"
