@@ -75,9 +75,15 @@ def test_uploaded_holdout_matches_recorded_metrics(monkeypatch, model_name):
     report = classification_report(
         target, predictions, labels=model.classes_, output_dict=True, zero_division=0
     )
+    expected_report = pd.DataFrame(
+        {name: values for name, values in report.items() if name != "accuracy"}
+    ).transpose().round(4)
     pd.testing.assert_frame_equal(
-        app.dataframe[0].value, pd.DataFrame(report).transpose().round(4)
+        app.dataframe[0].value, expected_report
     )
+    assert "accuracy" not in app.dataframe[0].value.index
+    assert app.dataframe[0].value.loc["weighted avg", "support"] == len(target)
+    assert any("Overall accuracy is shown" in caption.value for caption in app.caption)
 
 
 def test_confusion_chart_shows_counts_in_lecture_order():

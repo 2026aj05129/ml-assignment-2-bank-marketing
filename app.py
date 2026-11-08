@@ -243,12 +243,18 @@ def main() -> None:
         report = classification_report(
             target, predictions, labels=model.classes_, output_dict=True, zero_division=0
         )
+        report_table = pd.DataFrame(
+            {name: values for name, values in report.items() if name != "accuracy"}
+        ).transpose().round(4)
         st.dataframe(
-            pd.DataFrame(report).transpose().round(4),
+            report_table,
             use_container_width=True,
             height=230,
         )
-        st.caption("Support is the number of actual examples in each class.")
+        st.caption(
+            "Support is the number of actual examples in each class. "
+            "Overall accuracy is shown in the performance summary."
+        )
 
     with st.expander("Data preview"):
         st.caption(f"Showing the first {min(25, len(frame)):,} of {len(frame):,} rows.")
