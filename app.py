@@ -120,6 +120,17 @@ def main() -> None:
             color: #1c5f58;
             font-weight: 600;
         }
+        .screen-reader-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -233,10 +244,13 @@ def main() -> None:
         figure.savefig(image, format="png", dpi=100, bbox_inches="tight")
         plt.close(figure)
         st.image(image.getvalue(), use_column_width=True)
-        st.caption(
-            f"TP: {matrix[0, 0]:,}; FN: {matrix[0, 1]:,}; "
-            f"FP: {matrix[1, 0]:,}; TN: {matrix[1, 1]:,}. "
-            "Rows: actual class. Columns: predicted class. Positive class: yes."
+        st.markdown(
+            '<div class="screen-reader-only">Confusion matrix. '
+            "Rows are actual classes; columns are predicted classes. "
+            f"True positive: {matrix[0, 0]:,}; false negative: {matrix[0, 1]:,}; "
+            f"false positive: {matrix[1, 0]:,}; true negative: {matrix[1, 1]:,}. "
+            "The positive class is yes.</div>",
+            unsafe_allow_html=True,
         )
     with report_column:
         st.subheader("Classification report", anchor="classification-report")

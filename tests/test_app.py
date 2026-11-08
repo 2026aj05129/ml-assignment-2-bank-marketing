@@ -64,13 +64,16 @@ def test_uploaded_holdout_matches_recorded_metrics(monkeypatch, model_name):
     matrix = confusion_matrix(target, predictions, labels=["yes", "no"])
     assert any(
         all(
-            item in caption.value
+            item in element.value
             for item in (
-                f"TP: {matrix[0, 0]:,}", f"FN: {matrix[0, 1]:,}",
-                f"FP: {matrix[1, 0]:,}", f"TN: {matrix[1, 1]:,}",
+                'class="screen-reader-only"',
+                f"True positive: {matrix[0, 0]:,}",
+                f"false negative: {matrix[0, 1]:,}",
+                f"false positive: {matrix[1, 0]:,}",
+                f"true negative: {matrix[1, 1]:,}",
             )
         )
-        for caption in app.caption
+        for element in app.markdown
     )
     report = classification_report(
         target, predictions, labels=model.classes_, output_dict=True, zero_division=0
