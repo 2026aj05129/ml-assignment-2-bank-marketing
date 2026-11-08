@@ -28,13 +28,14 @@ def named_upload(content, name="test_data.csv"):
 @pytest.mark.parametrize("model_name", MODEL_NAMES)
 def test_uploaded_holdout_matches_recorded_metrics(monkeypatch, model_name):
     uploaded = named_upload((PROJECT_DIR / "test_data.csv").read_bytes())
-    monkeypatch.setattr(st, "file_uploader", lambda *args, **kwargs: uploaded)
     monkeypatch.setattr(st, "selectbox", lambda *args, **kwargs: model_name)
     expected = pd.read_csv(PROJECT_DIR / "results" / "metrics.csv").set_index("Model")
 
     with warnings.catch_warnings():
         warnings.simplefilter("error", InconsistentVersionWarning)
-        app = AppTest.from_file(str(PROJECT_DIR / "app.py")).run(timeout=120)
+        app = AppTest.from_file(str(PROJECT_DIR / "app.py"))
+        app.session_state["selected_upload"] = uploaded
+        app.run(timeout=120)
 
     assert not app.exception
     assert len(app.metric) == 6
@@ -128,8 +129,9 @@ def test_invalid_upload_shows_error(monkeypatch, fault):
         frame["age"] = frame["age"].astype(float)
         frame.loc[frame.index[0], "age"] = float("inf")
     uploaded = named_upload(frame.to_csv(index=False).encode())
-    monkeypatch.setattr(st, "file_uploader", lambda *args, **kwargs: uploaded)
-    app = AppTest.from_file(str(PROJECT_DIR / "app.py")).run(timeout=120)
+    app = AppTest.from_file(str(PROJECT_DIR / "app.py"))
+    app.session_state["selected_upload"] = uploaded
+    app.run(timeout=120)
     assert not app.exception
     assert len(app.error) == 1
     assert len(app.metric) == 0
@@ -204,17 +206,26 @@ def test_landing_page_shows_summary_without_model_loading():
     assert len(app.selectbox[0].options) == 5
     assert app.selectbox[0].disabled
     assert len(app.sidebar.selectbox) == 0
-    assert len(app.get("popover")) == 1
+    assert any(button.label == "Upload or change CSV" for button in app.button)
     assert any(item.value == "No CSV selected" for item in app.caption)
     assert any(item.value == "Upload a CSV to choose a model." for item in app.caption)
 
 
-def test_model_selection_tracks_upload_and_changes_results(monkeypatch):
-    selected = [None]
-    monkeypatch.setattr(st, "file_uploader", lambda *args, **kwargs: selected[0])
+def test_upload_dialog_saves_selection_and_returns_to_app(monkeypatch):
+    uploaded = named_upload((PROJECT_DIR / "test_data.csv").read_bytes())
+    monkeypatch.setattr(st, "file_uploader", lambda *args, **kwargs: uploaded)
+    app = AppTest.from_file(str(PROJECT_DIR / "app.py")).run()
+    next(button for button in app.button if button.label == "Upload or change CSV").click().run(timeout=120)
+    assert not app.exception
+    assert app.session_state["selected_upload"].name == "test_data.csv"
+    assert not app.selectbox[0].disabled
+    assert "Confusion matrix" in [heading.value for heading in app.subheader]
+
+
+def test_model_selection_tracks_upload_and_changes_results():
     app = AppTest.from_file(str(PROJECT_DIR / "app.py")).run()
     assert app.selectbox[0].disabled
-    selected[0] = named_upload((PROJECT_DIR / "test_data.csv").read_bytes())
+    app.session_state["selected_upload"] = named_upload((PROJECT_DIR / "test_data.csv").read_bytes())
     app.run(timeout=120)
     assert not app.exception
     assert not app.selectbox[0].disabled
@@ -222,7 +233,7 @@ def test_model_selection_tracks_upload_and_changes_results(monkeypatch):
     assert not app.exception
     assert app.selectbox[0].value == "Decision Tree"
     assert float(app.metric[0].value) == pytest.approx(0.8308)
-    selected[0] = None
+    app.session_state["selected_upload"] = None
     app.run(timeout=120)
     assert not app.exception
     assert app.selectbox[0].disabled
@@ -232,17 +243,14 @@ def test_model_selection_tracks_upload_and_changes_results(monkeypatch):
 
 
 @pytest.mark.parametrize("valid", [True, False])
-def test_back_to_overview_clears_selected_upload(monkeypatch, valid):
+def test_back_to_overview_clears_selected_upload(valid):
     content = (PROJECT_DIR / "test_data.csv").read_bytes() if valid else b""
     selected = named_upload(content)
-    monkeypatch.setattr(
-        st, "file_uploader",
-        lambda *args, **kwargs: selected if kwargs["key"] == "campaign_upload_0" else None,
-    )
-    app = AppTest.from_file(str(PROJECT_DIR / "app.py")).run(timeout=120)
+    app = AppTest.from_file(str(PROJECT_DIR / "app.py"))
+    app.session_state["selected_upload"] = selected
+    app.run(timeout=120)
     assert not app.exception
-    assert app.button[0].label == "← Overview"
-    app.button[0].click().run(timeout=120)
+    next(button for button in app.button if button.label == "← Overview").click().run(timeout=120)
     assert not app.exception
     assert app.selectbox[0].disabled
     assert "Campaign dataset" in [heading.value for heading in app.subheader]
@@ -250,10 +258,11 @@ def test_back_to_overview_clears_selected_upload(monkeypatch, valid):
     assert not app.error
 
 
-def test_selected_filename_is_escaped_even_for_invalid_csv(monkeypatch):
+def test_selected_filename_is_escaped_even_for_invalid_csv():
     uploaded = named_upload(b"", 'a"<tag>.csv')
-    monkeypatch.setattr(st, "file_uploader", lambda *args, **kwargs: uploaded)
-    app = AppTest.from_file(str(PROJECT_DIR / "app.py")).run()
+    app = AppTest.from_file(str(PROJECT_DIR / "app.py"))
+    app.session_state["selected_upload"] = uploaded
+    app.run()
     assert not app.exception
     assert len(app.error) == 1
     assert not app.selectbox[0].disabled
@@ -264,9 +273,10 @@ def test_selected_filename_is_escaped_even_for_invalid_csv(monkeypatch):
 
 
 @pytest.mark.parametrize("content", [b"", b"\xff", b"age,age,y\n1,2,no\n"])
-def test_invalid_csv_bytes_show_error(monkeypatch, content):
-    monkeypatch.setattr(st, "file_uploader", lambda *args, **kwargs: named_upload(content))
-    app = AppTest.from_file(str(PROJECT_DIR / "app.py")).run()
+def test_invalid_csv_bytes_show_error(content):
+    app = AppTest.from_file(str(PROJECT_DIR / "app.py"))
+    app.session_state["selected_upload"] = named_upload(content)
+    app.run()
     assert not app.exception
     assert len(app.error) == 1
     assert len(app.metric) == 0

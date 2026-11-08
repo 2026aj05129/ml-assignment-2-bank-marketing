@@ -45,7 +45,26 @@ def load_model(filename: str) -> Pipeline:
 
 
 def reset_upload() -> None:
+    st.session_state.pop("selected_upload", None)
     st.session_state["upload_generation"] = st.session_state.get("upload_generation", 0) + 1
+
+
+@st.dialog("Upload campaign CSV")
+def upload_dialog() -> None:
+    uploaded = st.file_uploader(
+        "Choose a CSV file", type="csv",
+        key=f"campaign_upload_{st.session_state.get('upload_generation', 0)}",
+    )
+    st.caption(
+        "Include all 15 trained inputs and both target labels, no and yes. "
+        "UTF-8 comma- or semicolon-delimited CSV, up to 10 MB and "
+        "100,000 rows. Missing feature values use the saved imputers; "
+        "extra columns including duration are ignored."
+    )
+    if uploaded is not None:
+        st.session_state["selected_upload"] = uploaded
+        st.session_state["upload_generation"] = st.session_state.get("upload_generation", 0) + 1
+        st.rerun()
 
 
 def main() -> None:
@@ -91,14 +110,18 @@ def main() -> None:
             text-overflow: ellipsis;
             white-space: nowrap;
         }
-        @media (max-width: 1000px) {
-            [data-testid="stHorizontalBlock"]:has(.upload-status):not(:has([data-testid="stHorizontalBlock"] .upload-status)) {
-                flex-wrap: wrap;
-            }
-            [data-testid="stHorizontalBlock"]:has(.upload-status):not(:has([data-testid="stHorizontalBlock"] .upload-status)) > [data-testid="column"] {
-                flex: 1 1 100%;
-                width: 100%;
-            }
+        [data-testid="column"]:has(.overview-nav) [data-testid="stButton"] {
+            display: flex;
+            justify-content: flex-end;
+        }
+        [data-testid="column"]:has(.overview-nav) [data-testid="stButton"] button {
+            background: transparent;
+            border-color: transparent;
+            color: #216b5d;
+        }
+        [data-testid="column"]:has(.overview-nav) [data-testid="stButton"] button:hover {
+            background: #e4f2ef;
+            border-color: #b6d9d1;
         }
         [data-testid="stMarkdownContainer"]:has(> .upload-status),
         [data-testid="stMarkdownContainer"]:has(> .evaluation-summary),
@@ -174,38 +197,21 @@ def main() -> None:
         """,
         unsafe_allow_html=True,
     )
-    st.title("Bank Marketing: Term Deposit Classification")
-    st.caption("UCI Bank Marketing | Upload labeled campaign data and select a model")
+    header = st.container()
+    uploaded = st.session_state.get("selected_upload")
     model_column, upload_column, sample_column = st.columns([3, 3, 2], gap="medium")
     with upload_column:
         st.caption("Evaluation data")
-        with st.popover("Upload or change CSV", use_container_width=True):
-            uploaded = st.file_uploader(
-                "Upload campaign CSV", type="csv",
-                key=f"campaign_upload_{st.session_state.get('upload_generation', 0)}",
-            )
-            st.caption(
-                "Include all 15 trained inputs and both target labels, no and yes. "
-                "UTF-8 comma- or semicolon-delimited CSV, up to 10 MB and "
-                "100,000 rows. Missing feature values use the saved imputers; "
-                "extra columns including duration are ignored."
-            )
+        if st.button("Upload or change CSV", use_container_width=True):
+            upload_dialog()
         if uploaded is None:
             st.caption("No CSV selected")
         else:
             filename = escape(uploaded.name, quote=True)
-            status_column, reset_column = st.columns([1.2, 1], vertical_alignment="center")
-            with status_column:
-                st.markdown(
-                    f'<div class="upload-status" title="{filename}">CSV selected: {filename}</div>',
-                    unsafe_allow_html=True,
-                )
-            with reset_column:
-                st.button(
-                    "← Overview",
-                    help="Clear the selected CSV and return to the dataset overview.",
-                    on_click=reset_upload,
-                )
+            st.markdown(
+                f'<div class="upload-status" title="{filename}">CSV selected: {filename}</div>',
+                unsafe_allow_html=True,
+            )
     with model_column:
         st.caption("Classification method")
         model_name = st.selectbox(
@@ -227,6 +233,22 @@ def main() -> None:
             )
         else:
             st.error("Sample test data is missing from the project.")
+    with header:
+        if uploaded is None:
+            st.title("Bank Marketing: Term Deposit Classification")
+            st.caption("UCI Bank Marketing | Upload labeled campaign data and select a model")
+        else:
+            title_column, navigation_column = st.columns([6, 1], vertical_alignment="center")
+            with title_column:
+                st.title("Bank Marketing: Term Deposit Classification")
+                st.caption("UCI Bank Marketing | Upload labeled campaign data and select a model")
+            with navigation_column:
+                st.markdown('<span class="overview-nav"></span>', unsafe_allow_html=True)
+                st.button(
+                    "← Overview",
+                    help="Clear the selected CSV and return to the dataset overview.",
+                    on_click=reset_upload,
+                )
     if uploaded is None:
         st.subheader("Campaign dataset")
         for column, label, value in zip(
