@@ -110,6 +110,10 @@ python train_models.py        # trains 5 models, writes model/, results/, test_d
 streamlit run app.py          # launch the evaluation app
 ```
 
+If an existing environment reports that PyArrow requires NumPy 2, reinstall
+the pinned requirements with `python -m pip install -r requirements.txt`.
+The app uses PyArrow 16.1.0 with NumPy 1.26.4; do not upgrade NumPy separately.
+
 ## Streamlit Community Cloud deployment
 
 Deploy this repository's `main` branch with `app.py` as the entrypoint. In
