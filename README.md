@@ -37,7 +37,7 @@ The raw CSV is semicolon-delimited; download it from UCI and place it at
 
 **GitHub repository:** https://github.com/2026aj05129/ml-assignment-2-bank-marketing
 
-**Live Streamlit app:** Pending deployment.
+**Live Streamlit app:** https://2026aj05129-bank-marketing.streamlit.app/
 
 ### Repository structure
 
