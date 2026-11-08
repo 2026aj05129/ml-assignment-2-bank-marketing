@@ -25,9 +25,15 @@ from src.upload import ignored_columns, read_uploaded_csv, split_features_target
 PROJECT_DIR = Path(__file__).resolve().parents[1]
 
 
+def named_upload(content, name="test_data.csv"):
+    upload = BytesIO(content)
+    upload.name = name
+    return upload
+
+
 @pytest.mark.parametrize("model_name", MODEL_NAMES)
 def test_uploaded_holdout_matches_recorded_metrics(monkeypatch, model_name):
-    uploaded = BytesIO((PROJECT_DIR / "test_data.csv").read_bytes())
+    uploaded = named_upload((PROJECT_DIR / "test_data.csv").read_bytes())
     monkeypatch.setattr(st, "file_uploader", lambda *args, **kwargs: uploaded)
     monkeypatch.setattr(st, "selectbox", lambda *args, **kwargs: model_name)
     expected = pd.read_csv(PROJECT_DIR / "results" / "metrics.csv").set_index("Model")
@@ -38,6 +44,7 @@ def test_uploaded_holdout_matches_recorded_metrics(monkeypatch, model_name):
 
     assert not app.exception
     assert len(app.metric) == 6
+    assert any("CSV selected: test_data.csv" in item.value for item in app.markdown)
     assert any(
         all(
             text in element.value
@@ -128,7 +135,7 @@ def test_invalid_upload_shows_error(monkeypatch, fault):
     elif fault == "infinity":
         frame["age"] = frame["age"].astype(float)
         frame.loc[frame.index[0], "age"] = float("inf")
-    uploaded = BytesIO(frame.to_csv(index=False).encode())
+    uploaded = named_upload(frame.to_csv(index=False).encode())
     monkeypatch.setattr(st, "file_uploader", lambda *args, **kwargs: uploaded)
     app = AppTest.from_file(str(PROJECT_DIR / "app.py")).run(timeout=120)
     assert not app.exception
@@ -204,11 +211,24 @@ def test_landing_page_shows_summary_without_model_loading():
     assert len(app.selectbox[0].options) == 5
     assert len(app.sidebar.selectbox) == 0
     assert len(app.get("popover")) == 1
+    assert any(item.value == "No CSV selected" for item in app.caption)
+
+
+def test_selected_filename_is_escaped_even_for_invalid_csv(monkeypatch):
+    uploaded = named_upload(b"", 'a"<tag>.csv')
+    monkeypatch.setattr(st, "file_uploader", lambda *args, **kwargs: uploaded)
+    app = AppTest.from_file(str(PROJECT_DIR / "app.py")).run()
+    assert not app.exception
+    assert len(app.error) == 1
+    assert any(
+        'CSV selected: a&quot;&lt;tag&gt;.csv' in item.value
+        for item in app.markdown
+    )
 
 
 @pytest.mark.parametrize("content", [b"", b"\xff", b"age,age,y\n1,2,no\n"])
 def test_invalid_csv_bytes_show_error(monkeypatch, content):
-    monkeypatch.setattr(st, "file_uploader", lambda *args, **kwargs: BytesIO(content))
+    monkeypatch.setattr(st, "file_uploader", lambda *args, **kwargs: named_upload(content))
     app = AppTest.from_file(str(PROJECT_DIR / "app.py")).run()
     assert not app.exception
     assert len(app.error) == 1

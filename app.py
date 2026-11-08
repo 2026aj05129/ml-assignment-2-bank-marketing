@@ -2,6 +2,7 @@
 
 import logging
 import pickle
+from html import escape
 from io import BytesIO
 from pathlib import Path
 import warnings
@@ -120,6 +121,13 @@ def main() -> None:
             color: #1c5f58;
             font-weight: 600;
         }
+        .upload-status {
+            color: #806f62;
+            font-size: 0.875rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
         .screen-reader-only {
             position: absolute;
             width: 1px;
@@ -139,7 +147,10 @@ def main() -> None:
     st.caption("UCI Bank Marketing | Select a model and upload labeled campaign data")
     model_column, upload_column, sample_column = st.columns([3, 3, 2], gap="medium")
     with model_column:
-        model_name = st.selectbox("Classification method", list(MODEL_FILES))
+        st.caption("Classification method")
+        model_name = st.selectbox(
+            "Classification method", list(MODEL_FILES), label_visibility="collapsed"
+        )
     with upload_column:
         st.caption("Evaluation data")
         with st.popover("Upload or change CSV", use_container_width=True):
@@ -150,7 +161,14 @@ def main() -> None:
                 "100,000 rows. Missing feature values use the saved imputers; "
                 "extra columns including duration are ignored."
             )
-        st.caption("CSV selected" if uploaded is not None else "No CSV selected")
+        if uploaded is None:
+            st.caption("No CSV selected")
+        else:
+            filename = escape(uploaded.name, quote=True)
+            st.markdown(
+                f'<div class="upload-status" title="{filename}">CSV selected: {filename}</div>',
+                unsafe_allow_html=True,
+            )
     with sample_column:
         st.caption("Example data")
         sample_path = PROJECT_DIR / "test_data.csv"
