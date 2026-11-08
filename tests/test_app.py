@@ -5,6 +5,11 @@ from pathlib import Path
 import warnings
 
 import joblib
+import matplotlib
+
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytest
@@ -13,6 +18,7 @@ from sklearn.exceptions import InconsistentVersionWarning
 from sklearn.metrics import classification_report, confusion_matrix
 from streamlit.testing.v1 import AppTest
 
+from app import make_confusion_chart
 from src.modeling import MODEL_NAMES
 from src.upload import ignored_columns, read_uploaded_csv, split_features_target
 
@@ -32,6 +38,14 @@ def test_uploaded_holdout_matches_recorded_metrics(monkeypatch, model_name):
 
     assert not app.exception
     assert len(app.metric) == 6
+    assert any(
+        all(
+            text in element.value
+            for text in (model_name, "9,043 records", "Actual no: 7,985",
+                         "Actual yes: 1,058", "Positive: yes")
+        )
+        for element in app.markdown
+    )
     for metric in app.metric:
         assert float(metric.value) == pytest.approx(
             expected.loc[model_name, metric.label], abs=0.000051
@@ -64,6 +78,24 @@ def test_uploaded_holdout_matches_recorded_metrics(monkeypatch, model_name):
     pd.testing.assert_frame_equal(
         app.dataframe[0].value, pd.DataFrame(report).transpose().round(4)
     )
+
+
+def test_confusion_chart_shows_counts_and_row_normalized_bars():
+    figure = make_confusion_chart(np.array([[199, 859], [107, 7878]]))
+    axis = figure.axes[0]
+    assert [patch.get_width() for patch in axis.patches] == pytest.approx(
+        [100 * 199 / 1058, 100 * 859 / 1058, 100 * 107 / 7985, 100 * 7878 / 7985]
+    )
+    labels = [text.get_text() for text in axis.texts]
+    assert labels == [
+        "ACTUAL YES  /  1,058 records",
+        "TP  Predicted yes: 199 (18.8%)",
+        "FN  Predicted no: 859 (81.2%)",
+        "ACTUAL NO  /  7,985 records",
+        "FP  Predicted yes: 107 (1.3%)",
+        "TN  Predicted no: 7,878 (98.7%)",
+    ]
+    plt.close(figure)
 
 
 @pytest.mark.parametrize("fault", ["empty", "no_target", "missing_feature", "single_class", "unknown_label", "invalid_numeric", "infinity"])

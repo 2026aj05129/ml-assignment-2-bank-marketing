@@ -45,6 +45,36 @@ def load_model(filename: str) -> Pipeline:
         return joblib.load(MODEL_DIR / filename)
 
 
+def make_confusion_chart(matrix):
+    """Show each actual class as a 100% stacked prediction bar."""
+    figure, axis = plt.subplots(figsize=(6.4, 2.2))
+    figure.patch.set_facecolor("#fffcf6")
+    axis.set_facecolor("#fffcf6")
+    colors = ("#167d82", "#da9b51")
+    labels = (("TP", "FN"), ("FP", "TN"))
+    for row, actual in enumerate(("Yes", "No")):
+        total = int(matrix[row].sum())
+        percentages = [100 * int(value) / total if total else 0 for value in matrix[row]]
+        y = 1 - row
+        axis.text(
+            0, y + 0.30, f"ACTUAL {actual.upper()}  /  {total:,} records",
+            fontsize=10, fontweight="bold", color="#3c3028", va="center",
+        )
+        axis.barh(y, percentages[0], height=0.16, color=colors[0])
+        axis.barh(y, percentages[1], left=percentages[0], height=0.16, color=colors[1])
+        for col, predicted in enumerate(("yes", "no")):
+            axis.text(
+                col * 52, y - 0.25,
+                f"{labels[row][col]}  Predicted {predicted}: {matrix[row, col]:,} "
+                f"({percentages[col]:.1f}%)",
+                fontsize=9, color=("#14666a", "#8d5418")[col], va="center",
+            )
+    axis.set(xlim=(0, 100), ylim=(-0.45, 1.5))
+    axis.axis("off")
+    figure.tight_layout(pad=0.2)
+    return figure
+
+
 def main() -> None:
     st.set_page_config(
         page_title="Term Deposit Insights", page_icon="📊",
@@ -53,13 +83,33 @@ def main() -> None:
     st.markdown(
         """
         <style>
-        .block-container {padding-top: 4rem; padding-bottom: 2rem;}
+        .block-container {padding-top: 2rem; padding-bottom: 2rem;}
         [data-testid="stVerticalBlock"] {gap: 0.6rem;}
         [data-testid="stMetric"] {
             background: #fffaf1;
             border: 1px solid #ead8bc;
             border-radius: 6px;
             padding: 0.6rem;
+        }
+        .evaluation-summary {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .evaluation-summary span {
+            background: #f4ede2;
+            border: 1px solid #e8dac7;
+            border-radius: 999px;
+            padding: 0.2rem 0.65rem;
+            color: #4b3b30;
+            font-size: 0.85rem;
+        }
+        .evaluation-summary .active-model {
+            background: #e4f2ef;
+            border-color: #b6d9d1;
+            color: #1c5f58;
+            font-weight: 600;
         }
         </style>
         """,
@@ -152,10 +202,15 @@ def main() -> None:
         st.error(f"Evaluation failed. Check the CSV feature values: {error}")
         return
 
-    st.write(
-        f"**{model_name}** | {len(features):,} rows | "
-        f"{int((target == 'no').sum()):,} no | {int((target == 'yes').sum()):,} yes "
-        "| positive class: yes"
+    st.markdown(
+        '<div class="evaluation-summary">'
+        f'<span class="active-model">{model_name}</span>'
+        f"<span>{len(features):,} records</span>"
+        f"<span>Actual no: {int((target == 'no').sum()):,}</span>"
+        f"<span>Actual yes: {int((target == 'yes').sum()):,}</span>"
+        "<span>Positive: yes</span>"
+        "</div>",
+        unsafe_allow_html=True,
     )
     st.subheader("Performance summary")
     for column, (name, value) in zip(st.columns(6), metrics.items(), strict=True):
@@ -164,48 +219,15 @@ def main() -> None:
     with matrix_column:
         st.subheader("Confusion matrix", anchor="confusion-matrix")
         matrix = confusion_matrix(target, predictions, labels=["yes", "no"])
-        figure, axis = plt.subplots(figsize=(4.6, 3.2))
-        figure.patch.set_facecolor("#fffcf6")
-        axis.set_facecolor("#fffcf6")
-        descriptions = (
-            ("True positive (TP)", "False negative (FN)"),
-            ("False positive (FP)", "True negative (TN)"),
-        )
-        colors = (("#dcebe3", "#f9e3ce"), ("#f9e3ce", "#dcebe3"))
-        for row in range(2):
-            for col in range(2):
-                axis.add_patch(
-                    plt.Rectangle(
-                        (col, row), 1, 1, facecolor=colors[row][col],
-                        edgecolor="#fffcf6", linewidth=5,
-                    )
-                )
-                axis.text(
-                    col + 0.5, row + 0.35, f"{matrix[row, col]:,}",
-                    ha="center", va="center", fontsize=20, fontweight="bold",
-                    color="#1e3a32",
-                )
-                axis.text(
-                    col + 0.5, row + 0.68, descriptions[row][col],
-                    ha="center", va="center", fontsize=9, color="#332316",
-                )
-        axis.set(xlim=(0, 2), ylim=(2, 0), aspect="equal")
-        axis.set_xticks([0.5, 1.5], ["Yes", "No"])
-        axis.set_yticks([0.5, 1.5], ["Yes", "No"])
-        axis.set_xlabel("Predicted class")
-        axis.set_ylabel("Actual class")
-        axis.tick_params(length=0)
-        for spine in axis.spines.values():
-            spine.set_visible(False)
-        figure.tight_layout()
+        figure = make_confusion_chart(matrix)
         image = BytesIO()
         figure.savefig(image, format="png", dpi=100, bbox_inches="tight")
         plt.close(figure)
-        st.image(image.getvalue(), width=300)
+        st.image(image.getvalue(), use_column_width=True)
         st.caption(
             f"TP: {matrix[0, 0]:,}; FN: {matrix[0, 1]:,}; "
             f"FP: {matrix[1, 0]:,}; TN: {matrix[1, 1]:,}. "
-            "Positive class: yes."
+            "Bars show the percentage within each actual class. Positive class: yes."
         )
     with report_column:
         st.subheader("Classification report", anchor="classification-report")
