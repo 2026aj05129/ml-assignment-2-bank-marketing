@@ -5,11 +5,6 @@ from pathlib import Path
 import warnings
 
 import joblib
-import matplotlib
-
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytest
@@ -18,7 +13,6 @@ from sklearn.exceptions import InconsistentVersionWarning
 from sklearn.metrics import classification_report, confusion_matrix
 from streamlit.testing.v1 import AppTest
 
-from app import make_confusion_chart
 from src.modeling import MODEL_NAMES
 from src.upload import ignored_columns, read_uploaded_csv, split_features_target
 
@@ -69,6 +63,21 @@ def test_uploaded_holdout_matches_recorded_metrics(monkeypatch, model_name):
     features, target = split_features_target(frame, model)
     predictions = model.predict(features)
     matrix = confusion_matrix(target, predictions, labels=["yes", "no"])
+    matrix_html = next(item.value for item in app.markdown if 'class="matrix-grid"' in item.value)
+    for code, count, label in (
+        ("TP", matrix[0, 0], "True positive"),
+        ("FN", matrix[0, 1], "False negative"),
+        ("FP", matrix[1, 0], "False positive"),
+        ("TN", matrix[1, 1], "True negative"),
+    ):
+        assert (
+            f'<span class="matrix-code">{code}</span>'
+            f'<span class="matrix-count">{count:,}</span>'
+            f'<span class="matrix-description">{label}</span>'
+        ) in matrix_html
+    assert [matrix_html.index(f'class="matrix-code">{code}') for code in ("TP", "FN", "FP", "TN")] == sorted(
+        matrix_html.index(f'class="matrix-code">{code}') for code in ("TP", "FN", "FP", "TN")
+    )
     assert any(
         all(
             item in element.value
@@ -97,24 +106,6 @@ def test_uploaded_holdout_matches_recorded_metrics(monkeypatch, model_name):
     assert app.dataframe[0].value.loc["weighted avg", "support"] == len(target)
     assert app.dataframe[0].proto.height == 0
     assert any("Overall accuracy is shown" in caption.value for caption in app.caption)
-
-
-def test_confusion_chart_shows_counts_in_lecture_order():
-    figure = make_confusion_chart(np.array([[199, 859], [107, 7878]]))
-    axis = figure.axes[0]
-    assert len(axis.patches) == 4
-    labels = {text.get_text(): text.get_position() for text in axis.texts}
-    for abbreviation, count, name in (
-        ("TP", "199", "True positive"), ("FN", "859", "False negative"),
-        ("FP", "107", "False positive"), ("TN", "7,878", "True negative"),
-    ):
-        assert labels[abbreviation][0] == labels[count][0] == labels[name][0]
-        assert labels[abbreviation][1] > labels[count][1] > labels[name][1]
-    assert labels["TP"][0] < labels["FN"][0]
-    assert labels["FP"][0] < labels["TN"][0]
-    assert labels["TP"][1] > labels["FP"][1]
-    assert labels["FN"][1] > labels["TN"][1]
-    plt.close(figure)
 
 
 @pytest.mark.parametrize("fault", ["empty", "no_target", "missing_feature", "single_class", "unknown_label", "invalid_numeric", "infinity"])

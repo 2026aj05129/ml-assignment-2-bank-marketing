@@ -3,13 +3,10 @@
 import logging
 import pickle
 from html import escape
-from io import BytesIO
 from pathlib import Path
 import warnings
 
 import joblib
-import matplotlib.pyplot as plt
-from matplotlib.patches import FancyBboxPatch
 import pandas as pd
 import streamlit as st
 from sklearn.exceptions import InconsistentVersionWarning
@@ -47,44 +44,6 @@ def load_model(filename: str) -> Pipeline:
         return joblib.load(MODEL_DIR / filename)
 
 
-def make_confusion_chart(matrix):
-    """Draw a two-by-two matrix with actual classes as rows."""
-    figure, axis = plt.subplots(figsize=(6.4, 2.45))
-    figure.patch.set_facecolor("#fffcf6")
-    axis.set_facecolor("#fffcf6")
-    axis.text(0.13, 0.99, "ACTUAL", fontsize=9, fontweight="bold", color="#66584d")
-    axis.text(0.62, 0.99, "PREDICTED", fontsize=9, fontweight="bold", color="#66584d")
-    for col, label in enumerate(("YES", "NO")):
-        axis.text(0.47 + col * 0.37, 0.88, label, ha="center",
-                  fontsize=10, fontweight="bold", color="#3c3028")
-    names = (("True positive", "False negative"), ("False positive", "True negative"))
-    abbreviations = (("TP", "FN"), ("FP", "TN"))
-    for row, label in enumerate(("YES", "NO")):
-        y = 0.48 - row * 0.42
-        axis.text(0.13, y + 0.16, label, va="center", fontsize=10,
-                  fontweight="bold", color="#3c3028")
-        for col in range(2):
-            x = 0.30 + col * 0.37
-            correct = row == col
-            axis.add_patch(FancyBboxPatch(
-                (x, y), 0.34, 0.34, boxstyle="round,pad=0.005,rounding_size=0.025",
-                facecolor="#e8f2ef" if correct else "#fff2e2",
-                edgecolor="#a4c9bd" if correct else "#e5bd87", linewidth=1,
-            ))
-            axis.text(x + 0.025, y + 0.27, abbreviations[row][col],
-                      fontsize=9, fontweight="bold",
-                      color="#216b5d" if correct else "#955414")
-            axis.text(x + 0.025, y + 0.15, f"{matrix[row, col]:,}",
-                      fontsize=16, fontweight="bold", color="#243b36", va="center")
-            axis.text(
-                x + 0.025, y + 0.03, names[row][col], fontsize=8.5, color="#51443a",
-            )
-    axis.set(xlim=(0, 1.05), ylim=(0, 1.05))
-    axis.axis("off")
-    figure.tight_layout(pad=0.2)
-    return figure
-
-
 def main() -> None:
     st.set_page_config(
         page_title="Term Deposit Insights", page_icon="📊",
@@ -93,7 +52,7 @@ def main() -> None:
     st.markdown(
         """
         <style>
-        .block-container {padding-top: 1.2rem; padding-bottom: 2rem;}
+        .block-container {padding-top: 3.2rem; padding-bottom: 2rem;}
         [data-testid="stVerticalBlock"] {gap: 0.6rem;}
         [data-testid="stMetric"] {
             background: #fffaf1;
@@ -127,6 +86,52 @@ def main() -> None:
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+        }
+        [data-testid="stMarkdownContainer"]:has(> .upload-status),
+        [data-testid="stMarkdownContainer"]:has(> .evaluation-summary),
+        [data-testid="stMarkdownContainer"]:has(> .matrix-grid) {
+            margin-bottom: 0;
+        }
+        .matrix-grid {
+            display: grid;
+            grid-template-columns: minmax(3.5rem, 0.42fr) repeat(2, minmax(0, 1fr));
+            gap: 0.3rem;
+            align-items: stretch;
+            width: 100%;
+        }
+        .matrix-axis {
+            color: #655749;
+            font-size: 0.78rem;
+            font-weight: 600;
+            text-align: center;
+            align-self: center;
+        }
+        .matrix-axis.predicted {grid-column: 2 / 4;}
+        .matrix-cell {
+            border: 1px solid #a4c9bd;
+            background: #e8f2ef;
+            border-radius: 8px;
+            padding: 0.35rem 0.7rem;
+            min-width: 0;
+        }
+        .matrix-cell.error {background: #fff2e2; border-color: #e5bd87;}
+        .matrix-cell .matrix-code {
+            color: #216b5d;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+        .matrix-cell.error .matrix-code {color: #955414;}
+        .matrix-cell .matrix-count {
+            color: #243b36;
+            display: block;
+            font-size: 1.35rem;
+            font-weight: 700;
+            line-height: 1.25;
+        }
+        .matrix-cell .matrix-description {
+            color: #51443a;
+            display: block;
+            font-size: 0.78rem;
         }
         .screen-reader-only {
             position: absolute;
@@ -257,11 +262,28 @@ def main() -> None:
     with matrix_column:
         st.subheader("Confusion matrix", anchor="confusion-matrix")
         matrix = confusion_matrix(target, predictions, labels=["yes", "no"])
-        figure = make_confusion_chart(matrix)
-        image = BytesIO()
-        figure.savefig(image, format="png", dpi=100, bbox_inches="tight")
-        plt.close(figure)
-        st.image(image.getvalue(), use_column_width=True)
+        st.markdown(
+            '<div class="matrix-grid" aria-hidden="true">'
+            '<div class="matrix-axis">ACTUAL</div>'
+            '<div class="matrix-axis predicted">PREDICTED</div>'
+            '<div></div><div class="matrix-axis">YES</div><div class="matrix-axis">NO</div>'
+            '<div class="matrix-axis">YES</div>'
+            f'<div class="matrix-cell"><span class="matrix-code">TP</span>'
+            f'<span class="matrix-count">{matrix[0, 0]:,}</span>'
+            '<span class="matrix-description">True positive</span></div>'
+            f'<div class="matrix-cell error"><span class="matrix-code">FN</span>'
+            f'<span class="matrix-count">{matrix[0, 1]:,}</span>'
+            '<span class="matrix-description">False negative</span></div>'
+            '<div class="matrix-axis">NO</div>'
+            f'<div class="matrix-cell error"><span class="matrix-code">FP</span>'
+            f'<span class="matrix-count">{matrix[1, 0]:,}</span>'
+            '<span class="matrix-description">False positive</span></div>'
+            f'<div class="matrix-cell"><span class="matrix-code">TN</span>'
+            f'<span class="matrix-count">{matrix[1, 1]:,}</span>'
+            '<span class="matrix-description">True negative</span></div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
         st.markdown(
             '<div class="screen-reader-only">Confusion matrix. '
             "Rows are actual classes; columns are predicted classes. "
