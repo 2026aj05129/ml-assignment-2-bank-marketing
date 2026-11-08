@@ -8,6 +8,7 @@ import warnings
 
 import joblib
 import matplotlib.pyplot as plt
+from matplotlib.patches import FancyBboxPatch
 import pandas as pd
 import streamlit as st
 from sklearn.exceptions import InconsistentVersionWarning
@@ -46,30 +47,38 @@ def load_model(filename: str) -> Pipeline:
 
 
 def make_confusion_chart(matrix):
-    """Show each actual class as a 100% stacked prediction bar."""
-    figure, axis = plt.subplots(figsize=(6.4, 2.2))
+    """Draw a two-by-two matrix with actual classes as rows."""
+    figure, axis = plt.subplots(figsize=(6.4, 2.45))
     figure.patch.set_facecolor("#fffcf6")
     axis.set_facecolor("#fffcf6")
-    colors = ("#167d82", "#da9b51")
-    labels = (("TP", "FN"), ("FP", "TN"))
-    for row, actual in enumerate(("Yes", "No")):
-        total = int(matrix[row].sum())
-        percentages = [100 * int(value) / total if total else 0 for value in matrix[row]]
-        y = 1 - row
-        axis.text(
-            0, y + 0.30, f"ACTUAL {actual.upper()}  /  {total:,} records",
-            fontsize=10, fontweight="bold", color="#3c3028", va="center",
-        )
-        axis.barh(y, percentages[0], height=0.16, color=colors[0])
-        axis.barh(y, percentages[1], left=percentages[0], height=0.16, color=colors[1])
-        for col, predicted in enumerate(("yes", "no")):
+    axis.text(0.13, 0.99, "ACTUAL", fontsize=9, fontweight="bold", color="#66584d")
+    axis.text(0.62, 0.99, "PREDICTED", fontsize=9, fontweight="bold", color="#66584d")
+    for col, label in enumerate(("YES", "NO")):
+        axis.text(0.47 + col * 0.37, 0.88, label, ha="center",
+                  fontsize=10, fontweight="bold", color="#3c3028")
+    names = (("True positive", "False negative"), ("False positive", "True negative"))
+    abbreviations = (("TP", "FN"), ("FP", "TN"))
+    for row, label in enumerate(("YES", "NO")):
+        y = 0.48 - row * 0.42
+        axis.text(0.13, y + 0.16, label, va="center", fontsize=10,
+                  fontweight="bold", color="#3c3028")
+        for col in range(2):
+            x = 0.30 + col * 0.37
+            correct = row == col
+            axis.add_patch(FancyBboxPatch(
+                (x, y), 0.34, 0.34, boxstyle="round,pad=0.005,rounding_size=0.025",
+                facecolor="#e8f2ef" if correct else "#fff2e2",
+                edgecolor="#a4c9bd" if correct else "#e5bd87", linewidth=1,
+            ))
+            axis.text(x + 0.025, y + 0.27, abbreviations[row][col],
+                      fontsize=9, fontweight="bold",
+                      color="#216b5d" if correct else "#955414")
+            axis.text(x + 0.025, y + 0.15, f"{matrix[row, col]:,}",
+                      fontsize=16, fontweight="bold", color="#243b36", va="center")
             axis.text(
-                col * 52, y - 0.25,
-                f"{labels[row][col]}  Predicted {predicted}: {matrix[row, col]:,} "
-                f"({percentages[col]:.1f}%)",
-                fontsize=9, color=("#14666a", "#8d5418")[col], va="center",
+                x + 0.025, y + 0.03, names[row][col], fontsize=8.5, color="#51443a",
             )
-    axis.set(xlim=(0, 100), ylim=(-0.45, 1.5))
+    axis.set(xlim=(0, 1.05), ylim=(0, 1.05))
     axis.axis("off")
     figure.tight_layout(pad=0.2)
     return figure
@@ -83,7 +92,7 @@ def main() -> None:
     st.markdown(
         """
         <style>
-        .block-container {padding-top: 2rem; padding-bottom: 2rem;}
+        .block-container {padding-top: 1.2rem; padding-bottom: 2rem;}
         [data-testid="stVerticalBlock"] {gap: 0.6rem;}
         [data-testid="stMetric"] {
             background: #fffaf1;
@@ -227,7 +236,7 @@ def main() -> None:
         st.caption(
             f"TP: {matrix[0, 0]:,}; FN: {matrix[0, 1]:,}; "
             f"FP: {matrix[1, 0]:,}; TN: {matrix[1, 1]:,}. "
-            "Bars show the percentage within each actual class. Positive class: yes."
+            "Rows: actual class. Columns: predicted class. Positive class: yes."
         )
     with report_column:
         st.subheader("Classification report", anchor="classification-report")

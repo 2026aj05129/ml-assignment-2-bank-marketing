@@ -80,21 +80,21 @@ def test_uploaded_holdout_matches_recorded_metrics(monkeypatch, model_name):
     )
 
 
-def test_confusion_chart_shows_counts_and_row_normalized_bars():
+def test_confusion_chart_shows_counts_in_lecture_order():
     figure = make_confusion_chart(np.array([[199, 859], [107, 7878]]))
     axis = figure.axes[0]
-    assert [patch.get_width() for patch in axis.patches] == pytest.approx(
-        [100 * 199 / 1058, 100 * 859 / 1058, 100 * 107 / 7985, 100 * 7878 / 7985]
-    )
-    labels = [text.get_text() for text in axis.texts]
-    assert labels == [
-        "ACTUAL YES  /  1,058 records",
-        "TP  Predicted yes: 199 (18.8%)",
-        "FN  Predicted no: 859 (81.2%)",
-        "ACTUAL NO  /  7,985 records",
-        "FP  Predicted yes: 107 (1.3%)",
-        "TN  Predicted no: 7,878 (98.7%)",
-    ]
+    assert len(axis.patches) == 4
+    labels = {text.get_text(): text.get_position() for text in axis.texts}
+    for abbreviation, count, name in (
+        ("TP", "199", "True positive"), ("FN", "859", "False negative"),
+        ("FP", "107", "False positive"), ("TN", "7,878", "True negative"),
+    ):
+        assert labels[abbreviation][0] == labels[count][0] == labels[name][0]
+        assert labels[abbreviation][1] > labels[count][1] > labels[name][1]
+    assert labels["TP"][0] < labels["FN"][0]
+    assert labels["FP"][0] < labels["TN"][0]
+    assert labels["TP"][1] > labels["FP"][1]
+    assert labels["FN"][1] > labels["TN"][1]
     plt.close(figure)
 
 
