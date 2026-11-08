@@ -230,6 +230,25 @@ def test_model_selection_tracks_upload_and_changes_results(monkeypatch):
     ]
 
 
+@pytest.mark.parametrize("valid", [True, False])
+def test_back_to_overview_clears_selected_upload(monkeypatch, valid):
+    content = (PROJECT_DIR / "test_data.csv").read_bytes() if valid else b""
+    selected = named_upload(content)
+    monkeypatch.setattr(
+        st, "file_uploader",
+        lambda *args, **kwargs: selected if kwargs["key"] == "campaign_upload_0" else None,
+    )
+    app = AppTest.from_file(str(PROJECT_DIR / "app.py")).run(timeout=120)
+    assert not app.exception
+    assert app.button[0].label == "Back to overview"
+    app.button[0].click().run(timeout=120)
+    assert not app.exception
+    assert app.selectbox[0].disabled
+    assert "Campaign dataset" in [heading.value for heading in app.subheader]
+    assert any(item.value == "No CSV selected" for item in app.caption)
+    assert not app.error
+
+
 def test_selected_filename_is_escaped_even_for_invalid_csv(monkeypatch):
     uploaded = named_upload(b"", 'a"<tag>.csv')
     monkeypatch.setattr(st, "file_uploader", lambda *args, **kwargs: uploaded)

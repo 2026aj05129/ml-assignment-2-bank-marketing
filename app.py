@@ -44,6 +44,10 @@ def load_model(filename: str) -> Pipeline:
         return joblib.load(MODEL_DIR / filename)
 
 
+def reset_upload() -> None:
+    st.session_state["upload_generation"] = st.session_state.get("upload_generation", 0) + 1
+
+
 def main() -> None:
     st.set_page_config(
         page_title="Term Deposit Insights", page_icon="📊",
@@ -124,7 +128,7 @@ def main() -> None:
             border: 1px solid #a4c9bd;
             background: #e8f2ef;
             border-radius: 8px;
-            padding: 0.35rem 0.7rem;
+            padding: 0.2rem 0.7rem;
             min-width: 0;
         }
         .matrix-cell.error {background: #fff2e2; border-color: #e5bd87;}
@@ -167,7 +171,10 @@ def main() -> None:
     with upload_column:
         st.caption("Evaluation data")
         with st.popover("Upload or change CSV", use_container_width=True):
-            uploaded = st.file_uploader("Upload campaign CSV", type="csv")
+            uploaded = st.file_uploader(
+                "Upload campaign CSV", type="csv",
+                key=f"campaign_upload_{st.session_state.get('upload_generation', 0)}",
+            )
             st.caption(
                 "Include all 15 trained inputs and both target labels, no and yes. "
                 "UTF-8 comma- or semicolon-delimited CSV, up to 10 MB and "
@@ -203,6 +210,8 @@ def main() -> None:
             )
         else:
             st.error("Sample test data is missing from the project.")
+        if uploaded is not None:
+            st.button("Back to overview", on_click=reset_upload, use_container_width=True)
     if uploaded is None:
         st.subheader("Campaign dataset")
         for column, label, value in zip(

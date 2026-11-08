@@ -139,7 +139,8 @@ not just the initial page: model loading only happens after a CSV is uploaded.
   The matrix uses `yes` as positive: rows are actual classes, columns are
   predicted classes, and the four boxes show TP, FN, FP and TN counts.
   Overall accuracy appears in the performance summary, not as a row in the
-  classification report.
+  classification report. **Back to overview** clears the selected CSV and
+  returns to the dataset summary and original holdout benchmark.
 - **Validate** required columns, duplicate headers, labels and numeric values.
   Missing feature values are handled by the fitted imputers. Extra columns,
   including `duration`, are ignored and listed in the app.
