@@ -91,6 +91,15 @@ def main() -> None:
             text-overflow: ellipsis;
             white-space: nowrap;
         }
+        @media (max-width: 1000px) {
+            [data-testid="stHorizontalBlock"]:has(.upload-status):not(:has([data-testid="stHorizontalBlock"] .upload-status)) {
+                flex-wrap: wrap;
+            }
+            [data-testid="stHorizontalBlock"]:has(.upload-status):not(:has([data-testid="stHorizontalBlock"] .upload-status)) > [data-testid="column"] {
+                flex: 1 1 100%;
+                width: 100%;
+            }
+        }
         [data-testid="stMarkdownContainer"]:has(> .upload-status),
         [data-testid="stMarkdownContainer"]:has(> .evaluation-summary),
         [data-testid="stMarkdownContainer"]:has(> .matrix-grid) {
@@ -185,10 +194,18 @@ def main() -> None:
             st.caption("No CSV selected")
         else:
             filename = escape(uploaded.name, quote=True)
-            st.markdown(
-                f'<div class="upload-status" title="{filename}">CSV selected: {filename}</div>',
-                unsafe_allow_html=True,
-            )
+            status_column, reset_column = st.columns([1.2, 1], vertical_alignment="center")
+            with status_column:
+                st.markdown(
+                    f'<div class="upload-status" title="{filename}">CSV selected: {filename}</div>',
+                    unsafe_allow_html=True,
+                )
+            with reset_column:
+                st.button(
+                    "← Overview",
+                    help="Clear the selected CSV and return to the dataset overview.",
+                    on_click=reset_upload,
+                )
     with model_column:
         st.caption("Classification method")
         model_name = st.selectbox(
@@ -210,12 +227,6 @@ def main() -> None:
             )
         else:
             st.error("Sample test data is missing from the project.")
-        if uploaded is not None:
-            st.button(
-                "← Back to overview",
-                help="Clear the selected CSV and return to the dataset overview.",
-                on_click=reset_upload,
-            )
     if uploaded is None:
         st.subheader("Campaign dataset")
         for column, label, value in zip(

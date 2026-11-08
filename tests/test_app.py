@@ -241,7 +241,7 @@ def test_back_to_overview_clears_selected_upload(monkeypatch, valid):
     )
     app = AppTest.from_file(str(PROJECT_DIR / "app.py")).run(timeout=120)
     assert not app.exception
-    assert app.button[0].label == "← Back to overview"
+    assert app.button[0].label == "← Overview"
     app.button[0].click().run(timeout=120)
     assert not app.exception
     assert app.selectbox[0].disabled
